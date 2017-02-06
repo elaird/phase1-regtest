@@ -61,7 +61,7 @@ Top_RESET_N
 Top_TRST_N        
 orbit_histo_clear 
 orbit_histo_run   
-"""
+""".split()
 
 
 def i_readables():
