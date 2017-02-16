@@ -1,5 +1,22 @@
 import pexpect
 from re import escape
+import signal
+import time
+
+class DelayedKeyboardInterrupt(object):
+    def __enter__(self):
+        self.signal_received = False
+        self.old_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, self.handler)
+
+    def handler(self, sig, frame):
+        self.signal_received = (sig, frame)
+        logging.debug('SIGINT received. Delaying KeyboardInterrupt.')
+
+    def __exit__(self, type, value, traceback):
+        signal.signal(signal.SIGINT, self.old_handler)
+        if self.signal_received:
+            self.old_handler(*self.signal_received)
 
 def send_commands(port, control_hub, cmds, script=False, raw=False, time_out=10):
     # Arguments and variables
@@ -82,11 +99,6 @@ def send_commands(port, control_hub, cmds, script=False, raw=False, time_out=10)
                         p.read() #Take care of any unfinished business so the process can rest in peace 
                 raw_output += p.before
                 p.close()
-
-        if int(options.verbosity) >= 2:
-            print raw_output
-        elif int(options.verbosity) == 1:
-            print output
 
         if raw:
             return raw_output
