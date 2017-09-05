@@ -1,29 +1,40 @@
 #!/usr/bin/env python
 
 import registers
-import os, pexpect, re
 
+from ngFECSendCommand import send_commands
 
-def responses(connection="", cmds=""):
-    out = []
-    p = pexpect.spawn(connection)
-    p.sendline("")
-    p.expect(".*")
+#magic constants ... python needs "static & const"
+port = 64004
+host = "hcal904daq04"
 
-    for cmd in cmds:
-        p.sendline(cmd)
-        p.expect("{0}\s?#((\s|E)[^\r^\n]*)".format(re.escape(cmd)), timeout=5)
-        out.append(p.match.group(0))
-        print out[-1]
-
-    p.sendline("quit")
-    p.expect(pexpect.EOF)
-    p.close()
-    # os.system("killall ngccm >& /dev/null")
-    return out
-
+def resetRBX(rbx):
+    cmds = ["put HE%i-bkp_pwr_enable 1"%rbx,
+            "put HE%i-bkp_reset 1"%rbx,
+            "wait",
+            "put HE%i-bkp_reset 0"%rbx
+           ]
+    return send_commands(port, host, cmds, script=True, raw=False, time_out=20)
 
 if __name__ == "__main__":
-    connection = "ngFEC.exe -z -c -p 64004 -H hcal904daq04"
-    cmds = ["get HE15-1-1-i_%s" % x for x in registers.i_readables()]
-    results = responses(connection, cmds)
+    #rbxes of of interest
+    rbxList = [12]
+    NIterations = 5
+    #Run reset on the boxes of interest
+    for rbx in rbxList:
+        print "=========================="
+        print "Reset RBX: %3i"%(rbx)
+        print "=========================="
+
+        print resetRBX(rbx)
+
+    #Get commands
+    for rbx in rbxList:
+        for i in xrange(NIterations):
+            print "=========================="
+            print "RBX: %3i    Iteration: %3i"%(rbx, i)
+            print "=========================="
+            cmds = ["get HE%i-%i-%i-B_%s" %(rbx, rm, card, x) for x in registers.B_readables() for rm in xrange(1, 5) for card in xrange(1, 5)]
+            results = send_commands(port, host, cmds, script=True, raw=False, time_out=20)
+            formattedResults = "\n".join(["%-40s : %s"%(x["cmd"], x["result"]) for x in results])
+            print formattedResults
