@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, pexpect, re, sys
+import printer
 
 
 def connect(host, port, logfile=sys.stdout):
@@ -27,28 +28,30 @@ def kill_clients():
 
 
 def command(p, cmd, timeout=5):
-    out = ""
-
-    p.sendline(cmd)
     fields = cmd.split()
     if not fields:
-        return out
+        return None
 
     if fields[0] == "jtag":
         if len(fields) < 4:
             print("COMMAND has to few fields: (%s)" % cmd)
-            return out
+            return None
 
-        p.expect("(.*)%s %s %s# retcode=(.*)" % tuple(fields[1:]), timeout=timeout)
-        out = p.match.group(0)
-        # print p.match.group(1) #.split("\r\n")
-        # print p.match.group(2).split()[0]
+        regexp = "(.*)%s %s %s# retcode=(.*)" % tuple(fields[1:])
     else:
-        try:
-            p.expect("{0}\s?#((\s|E)[^\r^\n]*)".format(re.escape(cmd)), timeout=timeout)
-            out = p.match.group(0)
-            # print(out)
-        except pexpect.TIMEOUT:
-            print("TIMEOUT (%s)" % cmd)
+        regexp = "{0}\s?#((\s|E)[^\r^\n]*)".format(re.escape(cmd))
 
-    return out
+    try:
+        p.sendline(cmd)
+        p.expect(regexp, timeout=timeout)
+        return p.match.group(0).split("\r\n")
+    except pexpect.TIMEOUT:
+        tail = "tail -20 %s" % p.logfile.name
+
+        msg  = printer.msg('The command "', p=False)
+        msg += printer.cyan(cmd, p=False)
+        msg += printer.msg('"\n       produced unexpected output.  Consult the log file, e.g.', p=False)
+        msg += printer.msg('\n       "%s" gives this:' % printer.gray(tail, p=False), p=False)
+        printer.error(msg)
+        os.system(tail)
+        sys.exit()
