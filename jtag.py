@@ -135,7 +135,7 @@ def work(server, target, rbx, options):
 
 
 def check_version(server, target):
-    print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION" % target)[0])
+    print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % target)[0])
 
 
 def errors(server, rbx, nSeconds):
