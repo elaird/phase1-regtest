@@ -125,11 +125,17 @@ def main(options, target):
 
 
 def work(server, target, rbx, options):
+    check_version(server, target)
     disable(server, rbx)
     reset_fec(server, rbx)
     errors(server, rbx, options.nSeconds)
     jtag(server, target, options)
     enable(server, rbx)
+    check_version(server, target)
+
+
+def check_version(server, target):
+    print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION" % target)[0])
 
 
 def errors(server, rbx, nSeconds):
