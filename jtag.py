@@ -63,16 +63,16 @@ def opts():
                       help=".stp file")
     parser.add_option("--stp-for-program",
                       dest="stpForProgram",
-                      default="/nfshome0/tgrassi/fw/HE/fixed_HE_RM_v3_03.stp",
+                      default="/nfshome0/akhukhun/firmware/fixed_HE_RM_v3_06.stp",
                       help=".stp file")
     parser.add_option("--nseconds",
                       dest="nSeconds",
-                      default=10,
+                      default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors")
     parser.add_option("--timeout-for-device-info",
                       dest="timeoutDeviceInfo",
-                      default=15,
+                      default=30,
                       type="int",
                       help="how many seconds to spend gather device info before timing out")
     parser.add_option("--timeout-for-verify",
@@ -82,9 +82,19 @@ def opts():
                       help="how many seconds to spend verifying before timing out")
     parser.add_option("--timeout-for-program",
                       dest="timeoutProgram",
-                      default=140,
+                      default=180,
                       type="int",
                       help="how many seconds to spend programming before timing out")
+    parser.add_option("--skip-verify",
+                      dest="skipVerify",
+                      default=False,
+                      action="store_true",
+                      help="skip VERIFY and go straight to PROGRAM")
+    parser.add_option("--program",
+                      dest="program",
+                      default=False,
+                      action="store_true",
+                      help="do PROGRAM")
 
     options, args = parser.parse_args()
 
@@ -103,7 +113,7 @@ def main(options, target):
     ngfec.kill_clients()
 
     logfile = open(options.logfile, "a")
-    print("Appending to %s (consider doing ' tail -f %s ' in another shell)" % (options.logfile, options.logfile))
+    print("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (options.logfile, options.logfile))
     h = "-" * 30 + "\n"
     logfile.write(h)
     logfile.write("| %s |\n" % str(datetime.datetime.today()))
@@ -133,23 +143,77 @@ def errors(server, rbx, nSeconds):
     fec2 = ngfec.command(server, fec)
     ccm2 = ngfec.command(server, ccm)
     if fec1 != fec2:
-        sys.exit("Link errors detected via FEC counters.")
+        sys.exit("Link errors detected via FEC counters:\n%s\n%s" % (fec1, fec2))
     if ccm1 != ccm2:
-        sys.exit("Link errors detected via CCM counters.")
+        sys.exit("Link errors detected via CCM counters:\n%s\n%s" % (ccm1, ccm2))
+
+
+def bail(lines):
+    sys.exit("\n".join(lines))
+
+
+def check_exit_codes(lines):
+    if not lines[-2].endswith("# retcode=0"):
+        bail(lines)
+    if lines[-4] != 'Exit code = 0... Success':
+        bail(lines)
+
+
+def check_dsn(lines):
+    for line in lines:
+        if 'key = "DSN"' not in line:
+            continue
+        fields = line.split()
+        value = fields[-1]
+        try:
+            if int(value, 16):
+                return
+        except ValueError:
+            continue
+    bail(lines)
+
+
+def check_for_jtag_errors(lines):
+    for line in lines:
+        if "Authentication Error" in line:
+            print "WAT1"
+            bail(lines)
+        if "Invalid/Corrupted programming file" in line:
+            print "WAT2"
+            bail(lines)
+        if "ERROR_CODE" in line:
+            fields = line.split()
+            value = fields[-1]
+            try:
+                if int(value, 16):
+                    bail(lines)
+            except ValueError:
+                bail(lines)
 
 
 def jtag(server, target, options):
-    print("Reading DEVICE_INFO (timeout %d seconds)" % options.timeoutDeviceInfo)
-    ngfec.command(server, "jtag %s %s DEVICE_INFO" % (options.stpForVerify, target), timeout=options.timeoutDeviceInfo)
+    print("Reading DEVICE_INFO (will time out in %d seconds)" % options.timeoutDeviceInfo)
+    lines = ngfec.command(server, "jtag %s %s DEVICE_INFO" % (options.stpForVerify, target), timeout=options.timeoutDeviceInfo)
+    check_exit_codes(lines)
+    check_dsn(lines)
 
-    print("VERIFYing against %s (timeout %d seconds)" % (options.stpForVerify, options.timeoutVerify))
-    ngfec.command(server, "jtag %s %s VERIFY" % (options.stpForVerify, target), timeout=options.timeoutVerify)
+    if not options.skipVerify:
+        print("VERIFYing against %s (will time out in %d seconds)" % (options.stpForVerify, options.timeoutVerify))
+        lines = ngfec.command(server, "jtag %s %s VERIFY" % (options.stpForVerify, target), timeout=options.timeoutVerify)
+        check_exit_codes(lines)
+        check_dsn(lines)
+        check_for_jtag_errors(lines)
 
-    # print("PROGRAMming with %s" % stpForProgram)
+    if options.program:
+        print("PROGRAMming with %s (will time out in %d seconds)" % (options.stpForProgram, options.timeoutProgram))
+        lines = ngfec.command(server, "jtag %s %s PROGRAM" % (options.stpForProgram, target), timeout=options.timeoutProgram)
+        check_exit_codes(lines)
+        check_dsn(lines)
+        check_for_jtag_errors(lines)
 
 
 def disable(server, rbx):
-    print("Disabling Peltier control")
+    print("Disabling Peltier control and guardian actions")
     # https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming
     ngfec.command(server, "tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg disable" % (rbx, rbx, rbx, rbx))
     ngfec.command(server, "put %s-[1-4]-peltier_control 4*0" % rbx)
@@ -170,7 +234,7 @@ def reset_fec(server, rbx):
 
 
 def enable(server, rbx):
-    print("Enabling Peltier control")
+    print("Enabling Peltier control and guardian actions")
     ngfec.command(server, "tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg enable" % (rbx, rbx, rbx, rbx))
     ngfec.command(server, "tput %s-lg push" % rbx)
     ngfec.command(server, "put %s-[1-4]-peltier_control 4*1" % rbx)
