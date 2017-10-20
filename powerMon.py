@@ -56,9 +56,14 @@ def main(options, _):
 
 
 def work(server, logfile):
-    logfile.write("\n" + ngfec.command(server, "get HE[7,8]-vtrx_rssi_J15_Cntrl_f_rr")[0])
-    logfile.write("\n" + ngfec.command(server, "get HE[7,8]-fec-sfp_tx_power_f")[0])
-    uhtr_powers = commandOutput("uHTRtool.exe -c 63:1 -s linkStatus.uhtr | grep PPOD0 -A 1 | tail -1")
+    boxes = "HE[1-18]"
+    for card in ["J14", "J15"]:
+        for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current"]:
+            logfile.write("\n" + ngfec.command(server, "get %s-%s_%s_Cntrl_f_rr" % (boxes, var, card))[0])
+
+    logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_tx_power_f" % boxes)[0])
+    logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_rx_power_f" % boxes)[0])
+    uhtr_powers = commandOutput("uHTRtool.exe -c 63:7 -s linkStatus.uhtr | grep PPOD0 -A 1 | tail -1")
     s = " ".join(uhtr_powers).replace("(uW)", "#")
     logfile.write("\nget " + s)
 
