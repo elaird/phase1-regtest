@@ -232,6 +232,7 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
     line0 = None
     line1 = None
     line2 = None
+    line3 = None
 
     can.cd(0)
     r.gPad.Clear()
@@ -256,12 +257,18 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         rbx = 1 + i
         keep.append(text.DrawText(0.15, 0.89, "HE %d" % rbx))
 
+        if 1 <= rbx <= 2:
+            x = 1508.84e6
+            line.SetLineStyle(5)
+            keep.append(line.DrawLine(x, 0.03, x, 0.4))
+            line3 = keep[-1]
+
         if rbx == 2:
             x = 1507.25e6
             line.SetLineStyle(1)
             keep.append(line.DrawLine(x, 0.03, x, 0.17))
             line1 = keep[-1]
-            
+
         if 3 <= rbx:
             x = 1508.24e6
             line.SetLineStyle(2)
@@ -289,6 +296,8 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         leg.AddEntry(line1, "#color[%d]{%s}" % (line1.GetLineColor(), "reassemble CCM (replacing J14 VTRx)"), "l")
     if line2 is not None:
         leg.AddEntry(line2, "#color[%d]{%s}" % (line2.GetLineColor(), "J15 TX #rightarrow J15 RX; FEC #leftrightarrow J14"), "l")
+    if line3 is not None:
+        leg.AddEntry(line3, "#color[%d]{%s}" % (line2.GetLineColor(), "J14 TX #rightarrow J14 RX; FEC #leftrightarrow J15"), "l")
     leg.Draw()
 
     can.Print(pdf)
