@@ -112,18 +112,21 @@ def sfp_filter(n, d):
 def main(fileName, n=18):
     J14s = []
     J15s = []
-    s = []
+    sr = []
+    st = []
     f = []
     for i in range(n):
         J14s.append(r.TGraph())
         J15s.append(r.TGraph())
-        s.append(r.TGraph())
+        sr.append(r.TGraph())
+        st.append(r.TGraph())
         f.append(r.TGraph())
 
         J14s[-1].SetTitle("<I> after J14 VTRx (mA)")
         J15s[-1].SetTitle("<I> after J15 VTRx (mA)")
 
-        s[-1].SetTitle("SFP TX <P> reported before split (mW)")
+        sr[-1].SetTitle("SFP RX <P> (mW)")
+        st[-1].SetTitle("SFP TX <P> reported before split (mW)")
         f[-1].SetTitle("SFP TX <P> meas. after split (mW)")
 
     rFact = 1.0e-3
@@ -139,19 +142,28 @@ def main(fileName, n=18):
 
         J14_rssis = assign(n, d.get("vtrx_rssi_J14"))
         J15_rssis = assign(n, d.get("vtrx_rssi_J15"))
-        sfps      = assign(n, d.get("fec-sfp_tx_power"))
+        J14_3v3   = assign(n, d.get("3V3_bkp_J14"))
+        J15_3v3   = assign(n, d.get("3V3_bkp_J15"))
+        J14_1v2i  = assign(n, d.get("1V2_current_J14"))
+        J15_1v2i  = assign(n, d.get("1V2_current_J15"))
+        J14_1v2v  = assign(n, d.get("1V2_voltage_J14"))
+        J15_1v2v  = assign(n, d.get("1V2_voltage_J15"))
+        sfp_rxs   = assign(n, d.get("fec-sfp_rx_power"))
+        sfp_txs   = assign(n, d.get("fec-sfp_tx_power"))
         powers    = assign(n, d.get("Power"))
 
         # hack for backward compatibility with 2-fiber setup
         if J15_rssis.count(None) == (n - 2):
             J14_rssis = [None] * 6 + J14_rssis[:2] + [None] * (n - 8)
             J15_rssis = [None] * 6 + J15_rssis[:2] + [None] * (n - 8)
-            sfps      = [None] * 6 + sfps[:2]      + [None] * (n - 8)
+            sfp_rxs   = [None] * 6 + sfp_rxs[:2]   + [None] * (n - 8)
+            sfp_txs   = [None] * 6 + sfp_txs[:2]   + [None] * (n - 8)
 
         for i in range(n):
             j14 = J14_rssis[i]
             j15 = J15_rssis[i]
-            sfp = sfps[i]
+            sfp_rx = sfp_rxs[i]
+            sfp_tx = sfp_txs[i]
             if i < 8:  # note reversal etc.
                 uhtr = powers[8 - i - 1]
             else:
@@ -166,8 +178,11 @@ def main(fileName, n=18):
             if j14 is not None and 0.05e-3 < j14 < 0.5e-3:
                 J14s[i].SetPoint(J14s[i].GetN(), x, j14 / rFact)
 
-            if sfp is not None:
-                s[i].SetPoint(s[i].GetN(), x, sfp / sFact)
+            if sfp_rx is not None and 0.01 < (sfp_rx / sFact):
+                sr[i].SetPoint(sr[i].GetN(), x, sfp_rx / sFact)
+
+            if sfp_tx is not None:
+                st[i].SetPoint(st[i].GetN(), x, sfp_tx / sFact)
 
             delta = 11.18e6
             if 6 <= i and (1517.598e6 - delta < x < 1517.955e6 - delta):
@@ -198,9 +213,9 @@ def main(fileName, n=18):
     yaxis.SetLabelSize(1.5 * yaxis.GetLabelSize())
 
     # page1(h, J15s[6], J15s[7], s[6], s[7], f[6], f[7], can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(0,  7, h, J15s, J14s, s, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(8, 15, h, J15s, J14s, s, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(16, 17, h, J15s, J14s, s, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
+    multi(0,  7, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
+    multi(8, 15, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
+    multi(16, 17, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
 
     can.Print(pdf + "]")
 
