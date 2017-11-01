@@ -58,24 +58,26 @@ def tuples(filename=""):
     out = {}
 
     f = open(filename)
-    iStart = None
+    xStart = None
     for iLine, line in enumerate(f):
         fields = line.split()
         if not fields:
             continue
 
         if line[4] == "-":
-            iStart = iLine
-            out[iStart] = [fields[0], fields[1], {}]
-            # out[iStart] = [stamp_to_int(lst), None, {}]
+            xStart = stamp_to_int(fields)
+            out[xStart] = {}
         if "get" not in fields[0]:
             continue
         if len(fields) < 5:
             continue
 
+        if xStart is None:
+            continue
+
         for stem in variables():
             if stem in fields[1]:
-                out[iStart][2][stem] = fields[3:]
+                out[xStart][stem] = fields[3:]
 
     f.close()
     return out
@@ -97,40 +99,27 @@ def assign(out, lst):
 
 def filtered(dct, n):
     out = []
-    for _, lst in sorted(dct.iteritems()):
-        # if not lst[2]:
-        #     continue
-
-        # ok = True
-        # for x in lst[2]:
-        #     if x is not None and ("I2C:" in x): # or "GEN:" in x or "timeout" in x):
-        #         ok = False
-        # if not ok:
-        #     continue
+    for x, d in sorted(dct.iteritems()):
+        if x is None:
+            continue
 
         J14_rssis = [None] * n
         J15_rssis = [None] * n
         sfps = [None] * n
         powers = [None] * n
 
-        assign(J14_rssis, lst[2].get("vtrx_rssi_J14"))
-        assign(J15_rssis, lst[2].get("vtrx_rssi_J15"))
-        assign(sfps,      lst[2].get("fec-sfp_tx_power"))
-        assign(powers,    lst[2].get("Power"))
+        assign(J14_rssis, d.get("vtrx_rssi_J14"))
+        assign(J15_rssis, d.get("vtrx_rssi_J15"))
+        assign(sfps,      d.get("fec-sfp_tx_power"))
+        assign(powers,    d.get("Power"))
 
         ok = True
-        for x in filter(lambda x: x is not None, sfps):
-            if x < 1.0:
+        for y in filter(lambda y: y is not None, sfps):
+            if y < 1.0:
                 ok = False
-                
+
         if not ok:
-            continue
-
-        # if power_fib0 < 1.0 or power_fib1 < 1.0:
-        #     continue
-
-        x = stamp_to_int(lst)
-        if x is None:
+            # print "skipping ", x, sfps
             continue
 
         out.append((x, J14_rssis, J15_rssis, sfps, powers))
