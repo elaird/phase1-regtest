@@ -83,9 +83,12 @@ def tuples(filename=""):
     return out
 
 
-def assign(out, lst):
+def assign(n, lst):
+    out = [None] * n
+
     if lst is None:
-        return
+        return out
+
     for i in range(len(lst)):
         if len(out) <= i:
             break
@@ -96,34 +99,14 @@ def assign(out, lst):
                 continue
             print e
 
-
-def filtered(dct, n):
-    out = []
-    for x, d in sorted(dct.iteritems()):
-        if x is None:
-            continue
-
-        J14_rssis = [None] * n
-        J15_rssis = [None] * n
-        sfps = [None] * n
-        powers = [None] * n
-
-        assign(J14_rssis, d.get("vtrx_rssi_J14"))
-        assign(J15_rssis, d.get("vtrx_rssi_J15"))
-        assign(sfps,      d.get("fec-sfp_tx_power"))
-        assign(powers,    d.get("Power"))
-
-        ok = True
-        for y in filter(lambda y: y is not None, sfps):
-            if y < 1.0:
-                ok = False
-
-        if not ok:
-            # print "skipping ", x, sfps
-            continue
-
-        out.append((x, J14_rssis, J15_rssis, sfps, powers))
     return out
+
+
+def sfp_filter(n, d):
+    sfps = assign(n, d.get("fec-sfp_tx_power"))
+    for y in filter(lambda y: y is not None, sfps):
+        if y < 1.0:
+            return True
 
 
 def main(fileName, n=18):
@@ -147,7 +130,17 @@ def main(fileName, n=18):
     sFact = 1.0e3
     pFact = sFact
 
-    for x, J14_rssis, J15_rssis, sfps, powers in filtered(tuples(fileName), n):
+    for x, d in sorted(tuples(fileName).iteritems()):
+        if x is None:
+            continue
+
+        if sfp_filter(n, d):
+            continue
+
+        J14_rssis = assign(n, d.get("vtrx_rssi_J14"))
+        J15_rssis = assign(n, d.get("vtrx_rssi_J15"))
+        sfps      = assign(n, d.get("fec-sfp_tx_power"))
+        powers    = assign(n, d.get("Power"))
 
         # hack for backward compatibility with 2-fiber setup
         if J15_rssis.count(None) == (n - 2):
