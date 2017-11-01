@@ -4,6 +4,31 @@ import datetime, sys
 import ROOT as r
 
 
+def variables():
+    out = ["Power", "fec-sfp_rx_power", "fec-sfp_tx_power"]
+    for card in ["J14", "J15"]:
+        for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current"]:
+            out.append("%s_%s" % (var, card))
+    return out
+
+
+def stamp_to_int(lst):
+    try:
+        year = int(lst[0][:4])
+        month = int(lst[0][5:7])
+        day = int(lst[0][8:])
+        hour = int(lst[1][:2])
+        min = int(lst[1][3:5])
+        sec = int(lst[1][6:8])
+        td = r.TDatime(year, month, day, hour, min, sec)
+        # x = td.Get()
+        x = td.Convert()
+    except ValueError as e:
+        print lst
+        x = None
+    return x
+
+
 def tuples(filename=""):
     # 2017-09-27 16:22:01.966990
     # get HE[7,8]-vtrx_rssi_J15_Cntrl_f_rr # 0.000126953 0.000129395
@@ -16,6 +41,20 @@ def tuples(filename=""):
     # get HE[1-8]-fec-sfp_tx_power_f # 505.5 558.4 532.5 542.5 526.5 490. 559.6 587.6
     # get HE[1-8]-fec-sfp_rx_power_f # 341.9 384.6 1011.2 847.3 853.7 474.2 443. 890.7
     # get Power # 268.7 239.1 116.5 139.5 167.0 247.4 218.7 275.5 0.0 0.0 0.0 0.0
+
+    # 2017-11-01 11:41:01.175211
+    # get HE[1-18]-vtrx_rssi_J14_Cntrl_f_rr # 0.000200195 0.000263672 0.000178223 0.000175781 0.000168457 0.000131836 0.000134277 0.000192871 0.000412598
+    # get HE[1-18]-3V3_bkp_J14_Cntrl_f_rr # 3.33008 3.3252 3.28125 3.21289 3.22266 3.20312 3.25195 3.34473 3.26172 3.30078 3.22754 3.25684 3.32031 3.2080
+    # get HE[1-18]-1V2_voltage_J14_Cntrl_f_rr # 1.21826 1.21826 1.23291 1.22559 1.22314 1.22314 1.23291 1.22803 1.22314 1.23535 1.21582 1.22559 1.22803 1
+    # get HE[1-18]-1V2_current_J14_Cntrl_f_rr # 0.393066 0.432129 0.41748 0.439453 0.429688 0.424805 0.412598 0.432129 0.43457 0.437012 0.41748 0.400391
+    # get HE[1-18]-vtrx_rssi_J15_Cntrl_f_rr # 0.000131836 0.000126953 0.000258789 0.000280762 0.000241699 0.00032959 0.000236816 0.000102539 0.000246582
+    # get HE[1-18]-3V3_bkp_J15_Cntrl_f_rr # 3.33496 3.33496 3.29102 3.21777 3.24219 3.20801 3.2666 3.36426 3.27637 3.29102 3.22266 3.27637 3.33984 3.2177
+    # get HE[1-18]-1V2_voltage_J15_Cntrl_f_rr # 1.2207 1.22314 1.22803 1.23291 1.22803 1.2207 1.22314 1.23047 1.22559 1.21826 1.22803 1.22559 1.22803 1.2
+    # get HE[1-18]-1V2_current_J15_Cntrl_f_rr # 0.415039 0.432129 0.319824 0.339355 0.34668 0.334473 0.446777 0.427246 0.432129 0.385742 0.419922 0.42968
+    # get HE[1-18]-fec-sfp_tx_power_f # 513.4 561.9 539.4 542.4 532.8 495.3 559.5 587.6 574.4 548. 559.6 516.4 577.7 563.5 560.3 573. 558.2 559.
+    # get HE[1-18]-fec-sfp_rx_power_f # 376.1 354.7 473.9 421.5 414.8 510.9 451.3 415.2 469.5 399. 353.2 335.6 391.5 424.1 390.4 418.3 490.3 425.5
+    # get Power # 270.8 233.3 118.0 138.8 184.0 254.7 215.9 280.1 0.0 0.0 0.0 0.0
+
     out = {}
 
     f = open(filename)
@@ -27,25 +66,16 @@ def tuples(filename=""):
 
         if line[4] == "-":
             iStart = iLine
-            out[iStart] = [fields[0], fields[1], None, None, None, None]
-            continue
-
+            out[iStart] = [fields[0], fields[1], {}]
+            # out[iStart] = [stamp_to_int(lst), None, {}]
         if "get" not in fields[0]:
             continue
         if len(fields) < 5:
             continue
 
-        if "vtrx_rssi_J14" in fields[1]:
-            out[iStart][2] = fields[3:]
-        if "vtrx_rssi_J15" in fields[1]:
-            out[iStart][3] = fields[3:]
-            # out[iStart][3] = fields[4]
-        if "fec-sfp_tx_power" in fields[1]:
-            out[iStart][4] = fields[3:]
-            # out[iStart][5] = fields[4]
-        if "Power" in fields[1]:
-            out[iStart][5] = fields[3:]
-            # out[iStart][7] = fields[4]
+        for stem in variables():
+            if stem in fields[1]:
+                out[iStart][2][stem] = fields[3:]
 
     f.close()
     return out
@@ -68,26 +98,25 @@ def assign(out, lst):
 def filtered(dct, n):
     out = []
     for _, lst in sorted(dct.iteritems()):
-        if lst.count(None) >= 4:
-            continue
+        # if not lst[2]:
+        #     continue
 
-        ok = True
-        for x in lst[2:]:
-            if x is not None and ("I2C:" in x): # or "GEN:" in x or "timeout" in x):
-                ok = False
-
-        if not ok:
-            continue
+        # ok = True
+        # for x in lst[2]:
+        #     if x is not None and ("I2C:" in x): # or "GEN:" in x or "timeout" in x):
+        #         ok = False
+        # if not ok:
+        #     continue
 
         J14_rssis = [None] * n
         J15_rssis = [None] * n
         sfps = [None] * n
         powers = [None] * n
 
-        assign(J14_rssis, lst[2])
-        assign(J15_rssis, lst[3])
-        assign(sfps, lst[4])
-        assign(powers, lst[5])
+        assign(J14_rssis, lst[2].get("vtrx_rssi_J14"))
+        assign(J15_rssis, lst[2].get("vtrx_rssi_J15"))
+        assign(sfps,      lst[2].get("fec-sfp_tx_power"))
+        assign(powers,    lst[2].get("Power"))
 
         ok = True
         for x in filter(lambda x: x is not None, sfps):
@@ -100,18 +129,8 @@ def filtered(dct, n):
         # if power_fib0 < 1.0 or power_fib1 < 1.0:
         #     continue
 
-        try:
-            year = int(lst[0][:4])
-            month = int(lst[0][5:7])
-            day = int(lst[0][8:])
-            hour = int(lst[1][:2])
-            min = int(lst[1][3:5])
-            sec = int(lst[1][6:8])
-            td = r.TDatime(year, month, day, hour, min, sec)
-            # x = td.Get()
-            x = td.Convert()
-        except ValueError as e:
-            print lst
+        x = stamp_to_int(lst)
+        if x is None:
             continue
 
         out.append((x, J14_rssis, J15_rssis, sfps, powers))
@@ -184,7 +203,7 @@ def main(fileName, n=18):
     can.SetGridy()
 
     # h = r.TH2D("null", ";date;various;", 1, 1516.9e6, 1518e6, 1, 0.0, 0.7) # Get
-    h = r.TH2D("null", ";date;;", 1, 1505.8e6, 1509.5e6, 1, 0.0, 0.7) # Convert
+    h = r.TH2D("null", ";date;;", 1, 1505.8e6, 1509.8e6, 1, 0.0, 0.7) # Convert
     h.SetStats(False)
     xaxis = h.GetXaxis()
     xaxis.SetTimeFormat("%m-%d")
