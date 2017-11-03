@@ -56,16 +56,19 @@ def main(options, _):
 
 
 def work(server, logfile):
-    boxes = "HE[1-18]"
-    for card in ["J14", "J15"]:
-        for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current"]:
-            logfile.write("\n" + ngfec.command(server, "get %s-%s_%s_Cntrl_f_rr" % (boxes, var, card))[0])
+    for iBox in range(1, 19):
+        rbx = "HE%d" % iBox
+        for card in ["J14", "J15"]:
+            for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current"]:
+                logfile.write("\n" + ngfec.command(server, "get %s-%s_%s_Cntrl_f_rr" % (rbx, var, card))[0])
 
-    logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_tx_power_f" % boxes)[0])
-    logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_rx_power_f" % boxes)[0])
-    uhtr_powers = commandOutput("uHTRtool.exe -c 63:7 -s linkStatus.uhtr | grep PPOD0 -A 1 | tail -1")
-    s = " ".join(uhtr_powers).replace("(uW)", "#")
-    logfile.write("\nget " + s)
+        logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_tx_power_f" % rbx)[0])
+        logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_rx_power_f" % rbx)[0])
+
+    for iPod in range(2):
+        uhtr_powers = commandOutput("uHTRtool.exe -c 63:7 -s linkStatus.uhtr | grep PPOD%d -A 1 | tail -1" % iPod)
+        s = " ".join(uhtr_powers).replace(" (uW)", "%d #" % iPod)
+        logfile.write("\nget " + s)
 
 
 if __name__ == "__main__":
