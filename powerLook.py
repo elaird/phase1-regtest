@@ -5,14 +5,14 @@ import ROOT as r
 
 
 def variables():
-    out = ["Power", "fec-sfp_rx_power", "fec-sfp_tx_power"]
+    out = ["Power", "Power0", "Power1", "fec-sfp_rx_power", "fec-sfp_tx_power"]
     for card in ["J14", "J15"]:
         for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current"]:
             out.append("%s_%s" % (var, card))
     return out
 
 
-def stamp_to_int(lst):
+def stamp_to_int(lst, fiveMins=False):
     try:
         year = int(lst[0][:4])
         month = int(lst[0][5:7])
@@ -21,15 +21,19 @@ def stamp_to_int(lst):
         min = int(lst[1][3:5])
         sec = int(lst[1][6:8])
         td = r.TDatime(year, month, day, hour, min, sec)
-        # x = td.Get()
         x = td.Convert()
     except ValueError as e:
         print lst
-        x = None
+        return None
+
+    # discard unless minute is multiple of five
+    if fiveMins and (min % 5):
+        return None
+
     return x
 
 
-def tuples(filename=""):
+def tuples(filename="", n=None):
     # 2017-09-27 16:22:01.966990
     # get HE[7,8]-vtrx_rssi_J15_Cntrl_f_rr # 0.000126953 0.000129395
     # get HE[7,8]-fec-sfp_tx_power_f # 569.1 585.2
@@ -65,18 +69,36 @@ def tuples(filename=""):
             continue
 
         if line[4] == "-":
-            xStart = stamp_to_int(fields)
+            xStart = stamp_to_int(fields, fiveMins=True)
             out[xStart] = {}
         if "get" not in fields[0]:
             continue
-        if len(fields) < 5:
+        if len(fields) < 4:
+            continue
+        if 'I2C:' in fields:
             continue
 
         if xStart is None:
             continue
 
         for stem in variables():
-            if stem in fields[1]:
+            if stem not in fields[1]:
+                continue
+
+            if len(fields) == 4:  # reads of single RBXes
+                if stem not in out[xStart]:
+                    out[xStart][stem] = ['0.0'] * n
+
+                iEnd = fields[1].find("-")
+                if iEnd == -1 or not fields[1].startswith("HE"):
+                    continue
+
+                try:
+                    iRbx = int(fields[1][2:iEnd])
+                    out[xStart][stem][iRbx - 1] = fields[3]
+                except ValueError:
+                    continue
+            else:
                 out[xStart][stem] = fields[3:]
 
     f.close()
@@ -133,7 +155,7 @@ def main(fileName, n=18):
     sFact = 1.0e3
     pFact = sFact
 
-    for x, d in sorted(tuples(fileName).iteritems()):
+    for x, d in sorted(tuples(fileName, n).iteritems()):
         if x is None:
             continue
 
@@ -150,7 +172,10 @@ def main(fileName, n=18):
         J15_1v2v  = assign(n, d.get("1V2_voltage_J15"))
         sfp_rxs   = assign(n, d.get("fec-sfp_rx_power"))
         sfp_txs   = assign(n, d.get("fec-sfp_tx_power"))
-        powers    = assign(n, d.get("Power"))
+        if x < 1509640201:
+            powers = assign(n, d.get("Power"))
+        else:
+            powers = assign(n, d.get("Power0"))
 
         # hack for backward compatibility with 2-fiber setup
         if J15_rssis.count(None) == (n - 2):
@@ -220,13 +245,14 @@ def main(fileName, n=18):
     can.Print(pdf + "]")
 
 
-def draw(g, color):
+def draw(gs, i, color):
+    g = gs[i]
     g.Draw("lp")
     g.SetLineStyle(7)
     g.SetLineColor(r.kGray)
     g.SetMarkerColor(color)
     if not g.GetN():
-        print "%s has N=0" % g.GetTitle()
+        print "%s (i=%d) has N=0" % (g.GetTitle(), i)
 
 
 def legify(leg, g, n):
@@ -264,11 +290,11 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         r.gPad.SetGridy()
 
         h.Draw()
-        draw(s[i], r.kBlack)
+        draw(s, i, r.kBlack)
         if i < 8:
-            draw(f[i], r.kOrange + 3)
-        draw(J15s[i], r.kBlue)
-        draw(J14s[i], r.kPink + 7)
+            draw(f, i, r.kOrange + 3)
+        draw(J15s, i, r.kBlue)
+        draw(J14s, i, r.kPink + 7)
 
         rbx = 1 + i
         keep.append(text.DrawText(0.15, 0.89, "HE %d" % rbx))
