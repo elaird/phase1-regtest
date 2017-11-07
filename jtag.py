@@ -12,15 +12,15 @@ def check_stp(stp):
 def check_target(target):
     coords = target.split("-")
     if not coords:
-        sys.exit("Expected RBX-RM-QIEcard or RBX-calib.  Found %s" % coords)
+        sys.exit("Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser.  Found %s" % coords)
 
     rbx = coords[0]
     if not rbx.startswith("HE"):
         sys.exit("This script only works with HE RBXes.")
 
     if len(coords) == 2:
-        if coords[1] != "calib":
-            sys.exit("Expected RBX-RM-QIEcard or RBX-calib")
+        if coords[1] not in ["calib", "pulser"]:
+            sys.exit("Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser.  Found %s" % str(coords))
     elif len(coords) == 3:
         try:
             rm = int(coords[1])
@@ -59,11 +59,11 @@ def opts():
                       help="log file to which to append")
     parser.add_option("--stp-for-verify",
                       dest="stpForVerify",
-                      default="/nfshome0/tgrassi/fw/HE/fixed_HE_RM_v3_03.stp",
+                      default="/nfshome0/tgrassi/fw/HE/fixed_HE_RM_v3_06.stp",
                       help=".stp file")
     parser.add_option("--stp-for-program",
                       dest="stpForProgram",
-                      default="/nfshome0/akhukhun/firmware/fixed_HE_RM_v3_06.stp",
+                      default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
                       help=".stp file")
     parser.add_option("--nseconds",
                       dest="nSeconds",
