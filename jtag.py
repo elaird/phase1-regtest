@@ -11,16 +11,18 @@ def check_stp(stp):
 
 def check_target(target):
     coords = target.split("-")
+    fail = "Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser or RBX-neigh.  Found %s" % str(target)
+
     if not coords:
-        sys.exit("Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser.  Found %s" % coords)
+        sys.exit(fail)
 
     rbx = coords[0]
     if not rbx.startswith("HE"):
         sys.exit("This script only works with HE RBXes.")
 
     if len(coords) == 2:
-        if coords[1] not in ["calib", "pulser"]:
-            sys.exit("Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser.  Found %s" % str(coords))
+        if coords[1] not in ["neigh", "calib", "pulser"]:
+            sys.exit(fail)
     elif len(coords) == 3:
         try:
             rm = int(coords[1])
@@ -35,7 +37,7 @@ def check_target(target):
         if q < 1 or 4 < q:
             sys.exit("QIEcard must be 1, 2, 3, or 4.")
     else:
-        sys.exit("Expected RBX-RM-QIEcard or RBX-calib.  Found %s" % coords)
+        sys.exit(fail)
 
     return rbx
 
@@ -57,14 +59,26 @@ def opts():
                       dest="logfile",
                       default="jtag.log",
                       help="log file to which to append")
-    parser.add_option("--stp-for-verify",
-                      dest="stpForVerify",
-                      default="/nfshome0/tgrassi/fw/HE/fixed_HE_RM_v3_06.stp",
-                      help=".stp file")
-    parser.add_option("--stp-for-program",
-                      dest="stpForProgram",
+    parser.add_option("--stp-igloo",
+                      dest="stpIgloo",
+                      metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
-                      help=".stp file")
+                      help="for QIEcard igloo FPGAs")
+    parser.add_option("--stp-pulser",
+                      dest="stpPulser",
+                      metavar="a.stp",
+                      default="/nfshome0/elaird/firmware/HE_Pulser_Ver6_fixed_FREQ_1.stp",
+                      help="for pulser FPGA")
+    parser.add_option("--stp-J15",
+                      dest="stpJ15",
+                      metavar="a.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
+                      help="for CCM J15 FPGA")
+    parser.add_option("--stp-J14",
+                      dest="stpJ14",
+                      metavar="a.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
+                      help="for CCM J14 FPGA")
     parser.add_option("--nseconds",
                       dest="nSeconds",
                       default=5,
@@ -89,7 +103,7 @@ def opts():
                       dest="skipVerify",
                       default=False,
                       action="store_true",
-                      help="skip VERIFY and go straight to PROGRAM")
+                      help="skip VERIFY")
     parser.add_option("--program",
                       dest="program",
                       default=False,
@@ -107,8 +121,6 @@ def opts():
 
 def main(options, target):
     rbx = check_target(target)
-    for stp in [options.stpForVerify, options.stpForProgram]:
-        check_stp(stp)
     # ngfec.survey_clients()
     ngfec.kill_clients()
 
@@ -135,7 +147,12 @@ def work(server, target, rbx, options):
 
 
 def check_version(server, target):
-    print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % target)[0])
+    if target.endswith("neigh"):
+        print("Reading firmware version: %s" % ngfec.command(server, "get %s_FPGA_SILSIG" % target.replace("neigh", "smezz"))[0])
+    elif target.endswith("pulser"):
+        print("Reading firmware version: %s" % ngfec.command(server, "get %s-fpga" % target)[0])
+    else:
+        print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % target)[0])
 
 
 def errors(server, rbx, nSeconds):
@@ -149,9 +166,9 @@ def errors(server, rbx, nSeconds):
     fec2 = ngfec.command(server, fec)
     ccm2 = ngfec.command(server, ccm)
     if fec1 != fec2:
-        sys.exit("Link errors detected via FEC counters:\n%s\n%s" % (fec1, fec2))
+        bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
     if ccm1 != ccm2:
-        sys.exit("Link errors detected via CCM counters:\n%s\n%s" % (ccm1, ccm2))
+        bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
 
 
 def bail(lines):
@@ -197,25 +214,54 @@ def check_for_jtag_errors(lines):
                 bail(lines)
 
 
-def jtag(server, target, options):
-    print("Reading DEVICE_INFO (will time out in %d seconds)" % options.timeoutDeviceInfo)
-    lines = ngfec.command(server, "jtag %s %s DEVICE_INFO" % (options.stpForVerify, target), timeout=options.timeoutDeviceInfo)
+def action(word, server, target, stp, timeout, check_jtag=True):
+    print("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
+    lines = ngfec.command(server, "jtag %s %s %s" % (stp, target, word), timeout=timeout)
     check_exit_codes(lines)
     check_dsn(lines)
+    if check_jtag:
+        check_for_jtag_errors(lines)
+
+
+def jtag(server, target, options):
+    if target.endswith("neigh"):
+        mezz = ngfec.command(server, "get %s_GEO_ADDR" % target.replace("neigh", "mezz"))[0]
+        smezz = ngfec.command(server, "get %s_GEO_ADDR" % target.replace("neigh", "smezz"))[0]
+
+        try:
+            mezz_geo_addr = int(mezz.split("#")[1])
+        except ValueError:
+            sys.exit("unexpected GEO_ADDR: %s" % mezz)
+
+        try:
+            smezz_geo_addr = int(smezz.split("#")[1])
+        except ValueError:
+            sys.exit("unexpected GEO_ADDR: %s" % smezz)
+
+        if set([mezz_geo_addr, smezz_geo_addr]) != set([1, 2]):
+            sys.exit("Unexpected GEO ADDRs: \n %s \n %s" % (mezz, smezz))
+
+        if smezz_geo_addr == 1:
+            stp = options.stpJ14
+        if smezz_geo_addr == 2:
+            stp = options.stpJ15
+
+        print(smezz)
+    elif target.endswith("pulser"):
+        stp = options.stpPulser
+        sys.exit("pulser not yet supported")
+    else:
+        stp = options.stpIgloo
+
+    check_stp(stp)
+
+    action("DEVICE_INFO", server, target, stp, options.timeoutDeviceInfo, check_jtag=False)
 
     if not options.skipVerify:
-        print("VERIFYing against %s (will time out in %d seconds)" % (options.stpForVerify, options.timeoutVerify))
-        lines = ngfec.command(server, "jtag %s %s VERIFY" % (options.stpForVerify, target), timeout=options.timeoutVerify)
-        check_exit_codes(lines)
-        check_dsn(lines)
-        check_for_jtag_errors(lines)
+        action("VERIFY", server, target, stp, options.timeoutVerify)
 
     if options.program:
-        print("PROGRAMming with %s (will time out in %d seconds)" % (options.stpForProgram, options.timeoutProgram))
-        lines = ngfec.command(server, "jtag %s %s PROGRAM" % (options.stpForProgram, target), timeout=options.timeoutProgram)
-        check_exit_codes(lines)
-        check_dsn(lines)
-        check_for_jtag_errors(lines)
+        action("PROGRAM", server, target, stp, options.timeoutProgram)
 
 
 def disable(server, rbx):
