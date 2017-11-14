@@ -48,57 +48,57 @@ def opts():
                       "--host",
                       dest="host",
                       default="hcal904daq04",
-                      help="ngccmserver host")
+                      help="ngccmserver host [default %default]")
     parser.add_option("-p",
                       "--port",
                       dest="port",
                       default=64000,
                       type="int",
-                      help="ngccmserver port number")
+                      help="ngccmserver port number [default %default]")
     parser.add_option("--log-file",
                       dest="logfile",
                       default="jtag.log",
-                      help="log file to which to append")
+                      help="log file to which to append [default %default]")
     parser.add_option("--stp-igloo",
                       dest="stpIgloo",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
-                      help="for QIEcard igloo FPGAs")
+                      help="[default %default]")
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/HE_Pulser_Ver6_fixed_FREQ_1.stp",
-                      help="for pulser FPGA")
+                      help="[default %default]")
     parser.add_option("--stp-J15",
                       dest="stpJ15",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
-                      help="for CCM J15 FPGA")
+                      help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
-                      help="for CCM J14 FPGA")
+                      help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
                       default=5,
                       type="int",
-                      help="number of seconds over which to integrate link errors")
+                      help="number of seconds over which to integrate link errors [default %default]")
     parser.add_option("--timeout-for-device-info",
                       dest="timeoutDeviceInfo",
                       default=30,
                       type="int",
-                      help="how many seconds to spend gather device info before timing out")
+                      help="how many seconds to spend gather device info before timing out [default %default]")
     parser.add_option("--timeout-for-verify",
                       dest="timeoutVerify",
                       default=140,
                       type="int",
-                      help="how many seconds to spend verifying before timing out")
+                      help="how many seconds to spend verifying before timing out [default %default]")
     parser.add_option("--timeout-for-program",
                       dest="timeoutProgram",
                       default=180,
                       type="int",
-                      help="how many seconds to spend programming before timing out")
+                      help="how many seconds to spend programming before timing out [default %default]")
     parser.add_option("--skip-verify",
                       dest="skipVerify",
                       default=False,
@@ -226,27 +226,20 @@ def action(word, server, target, stp, timeout, check_jtag=True):
 def jtag(server, target, options):
     if target.endswith("neigh"):
         mezz = ngfec.command(server, "get %s_GEO_ADDR" % target.replace("neigh", "mezz"))[0]
-        smezz = ngfec.command(server, "get %s_GEO_ADDR" % target.replace("neigh", "smezz"))[0]
 
         try:
             mezz_geo_addr = int(mezz.split("#")[1])
         except ValueError:
             sys.exit("unexpected GEO_ADDR: %s" % mezz)
 
-        try:
-            smezz_geo_addr = int(smezz.split("#")[1])
-        except ValueError:
-            sys.exit("unexpected GEO_ADDR: %s" % smezz)
+        if mezz_geo_addr == 1:
+            stp = options.stpJ15  # for smezz
+        elif mezz_geo_addr == 2:
+            stp = options.stpJ14  # for smezz
+        else:
+            sys.exit("unexpected GEO_ADDR: %s" % mezz)
 
-        if set([mezz_geo_addr, smezz_geo_addr]) != set([1, 2]):
-            sys.exit("Unexpected GEO ADDRs: \n %s \n %s" % (mezz, smezz))
-
-        if smezz_geo_addr == 1:
-            stp = options.stpJ14
-        if smezz_geo_addr == 2:
-            stp = options.stpJ15
-
-        print(smezz)
+        print(mezz)
     elif target.endswith("pulser"):
         stp = options.stpPulser
         sys.exit("pulser not yet supported")
