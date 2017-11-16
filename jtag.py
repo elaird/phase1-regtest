@@ -218,26 +218,34 @@ class programmer:
             print(mezz)
         elif self.target.endswith("pulser"):
             stp = self.options.stpPulser
-            self.bail(["pulser is not yet supported"])
         else:
             stp = self.options.stpIgloo
 
         self.check_stp(stp)
 
-        self.action("DEVICE_INFO", stp, 30, check_jtag=False)
+        if self.target.endswith("pulser"):
+            self.action("DEVICE_INFO", stp, 30, key="FSN", check_jtag=False)
+        else:
+            self.action("DEVICE_INFO", stp, 30, check_jtag=False)
 
         if not self.options.skipVerify:
-            self.action("VERIFY", stp, 140)
+            if self.target.endswith("pulser"):
+                self.action("VERIFY", stp, 500, key="FSN")
+            else:
+                self.action("VERIFY", stp, 140)
 
         if self.options.program:
-            self.action("PROGRAM", stp, 180)
+            if self.target.endswith("pulser"):
+                self.action("PROGRAM", stp, 700, key="FSN")
+            else:
+                self.action("PROGRAM", stp, 180)
 
 
-    def action(self, word, stp, timeout, check_jtag=True):
+    def action(self, word, stp, timeout, key="DSN", check_jtag=True):
         printer.cyan("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
         lines = ngfec.command(self.server, "jtag %s %s %s" % (stp, self.target, word), timeout=timeout)
         self.check_exit_codes(lines)
-        self.check_dsn(lines)
+        self.check_key(lines, key)
         if check_jtag:
             self.check_for_jtag_errors(lines)
 
@@ -257,9 +265,9 @@ class programmer:
             self.bail(lines)
 
 
-    def check_dsn(self, lines):
+    def check_key(self, lines, key):
         for line in lines:
-            if 'key = "DSN"' not in line:
+            if 'key = "%s"' % key not in line:
                 continue
             fields = line.split()
             value = fields[-1]
