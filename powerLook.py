@@ -134,6 +134,14 @@ def sfp_filter(n, d):
 def main(fileName, n=18):
     J14s = []
     J15s = []
+
+    # J14_3v3   = assign(n, d.get("3V3_bkp_J14"))
+    # J15_3v3   = assign(n, d.get("3V3_bkp_J15"))
+    # J14_1v2i  = assign(n, d.get("1V2_current_J14"))
+    # J15_1v2i  = assign(n, d.get("1V2_current_J15"))
+    # J14_1v2v  = assign(n, d.get("1V2_voltage_J14"))
+    # J15_1v2v  = assign(n, d.get("1V2_voltage_J15"))
+
     sr = []
     st = []
     f = []
@@ -225,7 +233,7 @@ def main(fileName, n=18):
     can.SetGridy()
 
     # h = r.TH2D("null", ";date;various;", 1, 1516.9e6, 1518e6, 1, 0.0, 0.7) # Get
-    h = r.TH2D("null", ";date;;", 1, 1505.8e6, 1509.8e6, 1, 0.0, 0.7) # Convert
+    h = r.TH2D("null", ";date;;", 1, 1505.8e6, 1511.0e6, 1, 0.0, 0.7) # Convert
     h.SetStats(False)
     xaxis = h.GetXaxis()
     xaxis.SetTimeFormat("%m-%d")
@@ -275,6 +283,8 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
     line1 = None
     line2 = None
     line3 = None
+    line4 = None
+    line5 = None
 
     can.cd(0)
     r.gPad.Clear()
@@ -299,10 +309,17 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         rbx = 1 + i
         keep.append(text.DrawText(0.15, 0.89, "HE %d" % rbx))
 
+        if rbx == 1:
+            x = 1509.71e6
+            line.SetLineStyle(3)
+            keep.append(line.DrawLine(x, 0.03, x, 0.36))
+            line4 = keep[-1]
+            line4.SetLineColor(r.kGreen)
+
         if 1 <= rbx <= 2:
             x = 1508.84e6
             line.SetLineStyle(5)
-            keep.append(line.DrawLine(x, 0.03, x, 0.4))
+            keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line3 = keep[-1]
 
         if rbx == 2:
@@ -323,6 +340,13 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line0 = keep[-1]
 
+        if rbx == 8:
+            x = 1509.6e6
+            line.SetLineStyle(1)
+            keep.append(line.DrawLine(x, 0.03, x, 0.36))
+            line5 = keep[-1]
+            line5.SetLineColor(r.kGreen)
+
 
     can.cd(9)
     leg = r.TLegend(0.0, 0.0, 1.0, 1.0)
@@ -340,6 +364,10 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         leg.AddEntry(line2, "#color[%d]{%s}" % (line2.GetLineColor(), "J15 TX #rightarrow J15 RX; FEC #leftrightarrow J14"), "l")
     if line3 is not None:
         leg.AddEntry(line3, "#color[%d]{%s}" % (line2.GetLineColor(), "J14 TX #rightarrow J14 RX; FEC #leftrightarrow J15"), "l")
+    if line4 is not None:
+        leg.AddEntry(line4, "#color[%d]{%s}" % (line4.GetLineColor(), "exchange CCM"), "l")
+    if line5 is not None:
+        leg.AddEntry(line5, "#color[%d]{%s}" % (line5.GetLineColor(), "reassemble CCM"), "l")
     leg.Draw()
 
     can.Print(pdf)
