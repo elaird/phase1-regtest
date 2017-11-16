@@ -1,12 +1,7 @@
 #!/usr/bin/env python2
 
-import ngfec
+import ngfec, printer
 import datetime, optparse, os, sys, time
-
-
-def check_stp(stp):
-    if not os.path.exists(stp):
-        sys.exit("A file with name '%s' does not exist." % stp)
 
 
 def check_target(target):
@@ -119,60 +114,166 @@ def opts():
     return options, args[0]
 
 
-def main(options, target):
-    rbx = check_target(target)
-    # ngfec.survey_clients()
-    ngfec.kill_clients()
+class programmer:
+    def __init__(self, options, target):
+        self.options = options
+        self.target = target
+        self.rbx = check_target(target)
 
-    logfile = open(options.logfile, "a")
-    print("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (options.logfile, options.logfile))
-    h = "-" * 30 + "\n"
-    logfile.write(h)
-    logfile.write("| %s |\n" % str(datetime.datetime.today()))
-    logfile.write(h)
-    server = ngfec.connect(options.host, options.port, logfile)
-    work(server, target, rbx, options)
-    ngfec.disconnect(server)
-    logfile.close()
+        self.connect()
 
+        self.check_version()
+        self.disable()
+        self.reset_fec()
+        self.errors()
+        self.jtag()
+        self.check_version()
 
-def work(server, target, rbx, options):
-    check_version(server, target)
-    disable(server, rbx)
-    reset_fec(server, rbx)
-    errors(server, rbx, options.nSeconds)
-    jtag(server, target, options)
-    enable(server, rbx)
-    check_version(server, target)
+        self.bail()
 
 
-def check_version(server, target):
-    if target.endswith("neigh"):
-        print("Reading firmware version: %s" % ngfec.command(server, "get %s_FPGA_SILSIG" % target.replace("neigh", "smezz"))[0])
-    elif target.endswith("pulser"):
-        print("Reading firmware version: %s" % ngfec.command(server, "get %s-fpga" % target)[0])
-    else:
-        print("Reading firmware version: %s" % ngfec.command(server, "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % target)[0])
+    def connect(self):
+        self.logfile = open(self.options.logfile, "a")
+        printer.gray("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (self.options.logfile, self.options.logfile))
+        h = "-" * 30 + "\n"
+        self.logfile.write(h)
+        self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
+        self.logfile.write(h)
+
+        # ngfec.survey_clients()
+        ngfec.kill_clients()
+        self.server = ngfec.connect(self.options.host, self.options.port, self.logfile)
 
 
-def errors(server, rbx, nSeconds):
-    print("Reading link error counters (integrating for %d seconds)" % nSeconds)
-    fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % rbx
-    ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % rbx
-    fec1 = ngfec.command(server, fec)
-    ccm1 = ngfec.command(server, ccm)
+    def disconnect(self):
+        ngfec.disconnect(self.server)
+        self.logfile.close()
 
-    time.sleep(nSeconds)
-    fec2 = ngfec.command(server, fec)
-    ccm2 = ngfec.command(server, ccm)
-    if fec1 != fec2:
-        bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
-    if ccm1 != ccm2:
-        bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
+
+    def command(self, cmd):
+        return ngfec.command(self.server, cmd)[0]
+
+
+    def check_version(self):
+        if self.target.endswith("neigh"):
+            cmd = "get %s_FPGA_SILSIG" % self.target.replace("neigh", "smezz")
+        elif self.target.endswith("pulser"):
+            cmd = "get %s-fpga" % self.target
+        else:
+            cmd = "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % self.target
+
+        print("Reading firmware version: %s" % self.command(cmd))
+
+
+    def disable(self):
+        print("Disabling Peltier control and guardian actions")
+        # https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming
+        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg disable" % (self.rbx, self.rbx, self.rbx, self.rbx))
+        self.command("put %s-[1-4]-peltier_control 4*0" % self.rbx)
+        time.sleep(2)
+        self.command("tput %s-[1-4]-[1-4]-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
+        self.command("tput %s-calib-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
+
+
+    def reset_fec(self):
+        print("Resetting JTAG part of FEC")
+        # ngfec.command(server, "put hefec3-cdce_sync 1")
+        # ngfec.command(server, "put hefec3-cdce_sync 0")
+        # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
+        # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
+        self.command("put %s-fec_jtag_part_reset 0" % self.rbx)
+        self.command("put %s-fec_jtag_part_reset 1" % self.rbx)
+        self.command("put %s-fec_jtag_part_reset 0" % self.rbx)
+
+
+    def enable(self):
+        print("Enabling Peltier control and guardian actions")
+        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg enable" % (self.rbx, self.rbx, self.rbx, self.rbx))
+        self.command("tput %s-lg push" % self.rbx)
+        self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
+
+
+    def errors(self):
+        print("Reading link error counters (integrating for %d seconds)" % self.options.nSeconds)
+        fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.rbx
+        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
+        fec1 = self.command(fec)
+        ccm1 = self.command(ccm)
+
+        time.sleep(self.options.nSeconds)
+        fec2 = self.command(fec)
+        ccm2 = self.command(ccm)
+        if fec1 != fec2:
+            self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
+        if ccm1 != ccm2:
+            self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
+
+
+    def check_stp(self, stp):
+        if not os.path.exists(stp):
+            self.bail(["A file with name '%s' does not exist." % stp])
+
+
+    def jtag(self):
+        if self.target.endswith("neigh"):
+            mezz = self.command( "get %s_GEO_ADDR" % self.target.replace("neigh", "mezz"))
+
+            try:
+                mezz_geo_addr = int(mezz.split("#")[1])
+            except ValueError:
+                self.bail(["Unexpected GEO_ADDR: %s" % mezz])
+
+            if mezz_geo_addr == 1:
+                stp = self.options.stpJ15  # for smezz
+            elif mezz_geo_addr == 2:
+                stp = self.options.stpJ14  # for smezz
+            else:
+                self.bail(["Unexpected GEO_ADDR: %s" % mezz])
+
+            print(mezz)
+        elif self.target.endswith("pulser"):
+            stp = self.options.stpPulser
+            self.bail(["pulser is not yet supported"])
+        else:
+            stp = self.options.stpIgloo
+
+        self.check_stp(stp)
+
+        self.action("DEVICE_INFO", stp, check_jtag=False)
+
+        if not self.options.skipVerify:
+            self.action("VERIFY", stp)
+
+        if self.options.program:
+            self.action("PROGRAM", stp)
+
+
+    def action(self, word, stp, check_jtag=True):
+        if word == "DEVICE_INFO":
+            timeout = self.options.timeoutDeviceInfo
+        if word == "VERIFY":
+            timeout = self.options.timeoutVerify
+        if word == "PROGRAM":
+            timeout = self.options.timeoutProgram
+
+        printer.cyan("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
+        lines = ngfec.command(self.server, "jtag %s %s %s" % (stp, self.target, word), timeout=timeout)
+        check_exit_codes(lines)
+        check_dsn(lines)
+        if check_jtag:
+            check_for_jtag_errors(lines)
+
+
+    def bail(self, lines=None):
+        if lines:
+            printer.red("\n".join(lines))
+        self.enable()
+        self.disconnect()
+        sys.exit()
 
 
 def bail(lines):
-    sys.exit("\n".join(lines))
+        sys.exit("\n".join(lines))
 
 
 def check_exit_codes(lines):
@@ -214,76 +315,5 @@ def check_for_jtag_errors(lines):
                 bail(lines)
 
 
-def action(word, server, target, stp, timeout, check_jtag=True):
-    print("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
-    lines = ngfec.command(server, "jtag %s %s %s" % (stp, target, word), timeout=timeout)
-    check_exit_codes(lines)
-    check_dsn(lines)
-    if check_jtag:
-        check_for_jtag_errors(lines)
-
-
-def jtag(server, target, options):
-    if target.endswith("neigh"):
-        mezz = ngfec.command(server, "get %s_GEO_ADDR" % target.replace("neigh", "mezz"))[0]
-
-        try:
-            mezz_geo_addr = int(mezz.split("#")[1])
-        except ValueError:
-            sys.exit("unexpected GEO_ADDR: %s" % mezz)
-
-        if mezz_geo_addr == 1:
-            stp = options.stpJ15  # for smezz
-        elif mezz_geo_addr == 2:
-            stp = options.stpJ14  # for smezz
-        else:
-            sys.exit("unexpected GEO_ADDR: %s" % mezz)
-
-        print(mezz)
-    elif target.endswith("pulser"):
-        stp = options.stpPulser
-        sys.exit("pulser not yet supported")
-    else:
-        stp = options.stpIgloo
-
-    check_stp(stp)
-
-    action("DEVICE_INFO", server, target, stp, options.timeoutDeviceInfo, check_jtag=False)
-
-    if not options.skipVerify:
-        action("VERIFY", server, target, stp, options.timeoutVerify)
-
-    if options.program:
-        action("PROGRAM", server, target, stp, options.timeoutProgram)
-
-
-def disable(server, rbx):
-    print("Disabling Peltier control and guardian actions")
-    # https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming
-    ngfec.command(server, "tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg disable" % (rbx, rbx, rbx, rbx))
-    ngfec.command(server, "put %s-[1-4]-peltier_control 4*0" % rbx)
-    time.sleep(2)
-    ngfec.command(server, "tput %s-[1-4]-[1-4]-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % rbx)
-    ngfec.command(server, "tput %s-calib-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % rbx)
-
-
-def reset_fec(server, rbx):
-    print("Resetting JTAG part of FEC")
-    # ngfec.command(server, "put hefec3-cdce_sync 1")
-    # ngfec.command(server, "put hefec3-cdce_sync 0")
-    # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
-    # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
-    ngfec.command(server, "put %s-fec_jtag_part_reset 0" % rbx)
-    ngfec.command(server, "put %s-fec_jtag_part_reset 1" % rbx)
-    ngfec.command(server, "put %s-fec_jtag_part_reset 0" % rbx)
-
-
-def enable(server, rbx):
-    print("Enabling Peltier control and guardian actions")
-    ngfec.command(server, "tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg enable" % (rbx, rbx, rbx, rbx))
-    ngfec.command(server, "tput %s-lg push" % rbx)
-    ngfec.command(server, "put %s-[1-4]-peltier_control 4*1" % rbx)
-
-
 if __name__ == "__main__":
-    main(*opts())
+    p = programmer(*opts())
