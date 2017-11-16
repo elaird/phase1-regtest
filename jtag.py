@@ -79,21 +79,6 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
-    parser.add_option("--timeout-for-device-info",
-                      dest="timeoutDeviceInfo",
-                      default=30,
-                      type="int",
-                      help="how many seconds to spend gather device info before timing out [default %default]")
-    parser.add_option("--timeout-for-verify",
-                      dest="timeoutVerify",
-                      default=140,
-                      type="int",
-                      help="how many seconds to spend verifying before timing out [default %default]")
-    parser.add_option("--timeout-for-program",
-                      dest="timeoutProgram",
-                      default=180,
-                      type="int",
-                      help="how many seconds to spend programming before timing out [default %default]")
     parser.add_option("--skip-verify",
                       dest="skipVerify",
                       default=False,
@@ -239,29 +224,22 @@ class programmer:
 
         self.check_stp(stp)
 
-        self.action("DEVICE_INFO", stp, check_jtag=False)
+        self.action("DEVICE_INFO", stp, 30, check_jtag=False)
 
         if not self.options.skipVerify:
-            self.action("VERIFY", stp)
+            self.action("VERIFY", stp, 140)
 
         if self.options.program:
-            self.action("PROGRAM", stp)
+            self.action("PROGRAM", stp, 180)
 
 
-    def action(self, word, stp, check_jtag=True):
-        if word == "DEVICE_INFO":
-            timeout = self.options.timeoutDeviceInfo
-        if word == "VERIFY":
-            timeout = self.options.timeoutVerify
-        if word == "PROGRAM":
-            timeout = self.options.timeoutProgram
-
+    def action(self, word, stp, timeout, check_jtag=True):
         printer.cyan("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
         lines = ngfec.command(self.server, "jtag %s %s %s" % (stp, self.target, word), timeout=timeout)
-        check_exit_codes(lines)
-        check_dsn(lines)
+        self.check_exit_codes(lines)
+        self.check_dsn(lines)
         if check_jtag:
-            check_for_jtag_errors(lines)
+            self.check_for_jtag_errors(lines)
 
 
     def bail(self, lines=None):
@@ -272,47 +250,43 @@ class programmer:
         sys.exit()
 
 
-def bail(lines):
-        sys.exit("\n".join(lines))
+    def check_exit_codes(self, lines):
+        if not lines[-2].endswith("# retcode=0"):
+            self.bail(lines)
+        if lines[-4] != 'Exit code = 0... Success':
+            self.bail(lines)
 
 
-def check_exit_codes(lines):
-    if not lines[-2].endswith("# retcode=0"):
-        bail(lines)
-    if lines[-4] != 'Exit code = 0... Success':
-        bail(lines)
-
-
-def check_dsn(lines):
-    for line in lines:
-        if 'key = "DSN"' not in line:
-            continue
-        fields = line.split()
-        value = fields[-1]
-        try:
-            if int(value, 16):
-                return
-        except ValueError:
-            continue
-    bail(lines)
-
-
-def check_for_jtag_errors(lines):
-    for line in lines:
-        if "Authentication Error" in line:
-            print "WAT1"
-            bail(lines)
-        if "Invalid/Corrupted programming file" in line:
-            print "WAT2"
-            bail(lines)
-        if "ERROR_CODE" in line:
+    def check_dsn(self, lines):
+        for line in lines:
+            if 'key = "DSN"' not in line:
+                continue
             fields = line.split()
             value = fields[-1]
             try:
                 if int(value, 16):
-                    bail(lines)
+                    return
             except ValueError:
-                bail(lines)
+                continue
+        self.bail(lines)
+
+
+    def check_for_jtag_errors(self, lines):
+        for line in lines:
+            if "Authentication Error" in line:
+                print "WAT1"
+                self.bail(lines)
+            if "Invalid/Corrupted programming file" in line:
+                print "WAT2"
+                self.bail(lines)
+            if "ERROR_CODE" in line:
+                fields = line.split()
+                value = fields[-1]
+                try:
+                    if int(value, 16):
+                        self.bail(lines)
+                except ValueError:
+                    self.bail(lines)
 
 
 if __name__ == "__main__":
