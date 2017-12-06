@@ -132,28 +132,41 @@ def sfp_filter(n, d):
 
 
 def main(fileName, n=18):
-    J14s = []
-    J15s = []
+    J14_rssi = []
+    J14_3v3  = []
+    J14_1v2i = []
+    J14_1v2v = []
 
-    # J14_3v3   = assign(n, d.get("3V3_bkp_J14"))
-    # J15_3v3   = assign(n, d.get("3V3_bkp_J15"))
-    # J14_1v2i  = assign(n, d.get("1V2_current_J14"))
-    # J15_1v2i  = assign(n, d.get("1V2_current_J15"))
-    # J14_1v2v  = assign(n, d.get("1V2_voltage_J14"))
-    # J15_1v2v  = assign(n, d.get("1V2_voltage_J15"))
+    J15_rssi = []
+    J15_3v3  = []
+    J15_1v2i = []
+    J15_1v2v = []
 
     sr = []
     st = []
     f = []
     for i in range(n):
-        J14s.append(r.TGraph())
-        J15s.append(r.TGraph())
+        J14_rssi.append(r.TGraph())
+        J14_3v3.append(r.TGraph())
+        J14_1v2i.append(r.TGraph())
+        J14_1v2v.append(r.TGraph())
+        J15_rssi.append(r.TGraph())
+        J15_3v3.append(r.TGraph())
+        J15_1v2i.append(r.TGraph())
+        J15_1v2v.append(r.TGraph())
+
         sr.append(r.TGraph())
         st.append(r.TGraph())
         f.append(r.TGraph())
 
-        J14s[-1].SetTitle("<I> after J14 VTRx (mA)")
-        J15s[-1].SetTitle("<I> after J15 VTRx (mA)")
+        J14_rssi[-1].SetTitle("<I> after J14 VTRx (mA)")
+        J14_3v3[-1].SetTitle("3v3 J14 (x)")
+        J14_1v2i[-1].SetTitle("1v2i J14 (x)")
+        J14_1v2v[-1].SetTitle("1v2v J14 (x)")
+        J15_rssi[-1].SetTitle("<I> after J15 VTRx (mA)")
+        J15_3v3[-1].SetTitle("3v3 J15 (x)")
+        J15_1v2i[-1].SetTitle("1v2i J15 (x)")
+        J15_1v2v[-1].SetTitle("1v2v J15 (x)")
 
         sr[-1].SetTitle("SFP RX <P> (mW)")
         st[-1].SetTitle("SFP TX <P> reported before split (mW)")
@@ -170,20 +183,29 @@ def main(fileName, n=18):
         if sfp_filter(n, d):
             continue
 
+        if hem and (hemEnd < x):
+            continue
+
+        if (x < hemEnd) and not hem:
+            continue
+
         J14_rssis = assign(n, d.get("vtrx_rssi_J14"))
+        J14_3v3s  = assign(n, d.get("3V3_bkp_J14"))
+        J14_1v2is = assign(n, d.get("1V2_current_J14"))
+        J14_1v2vs = assign(n, d.get("1V2_voltage_J14"))
+
         J15_rssis = assign(n, d.get("vtrx_rssi_J15"))
-        J14_3v3   = assign(n, d.get("3V3_bkp_J14"))
-        J15_3v3   = assign(n, d.get("3V3_bkp_J15"))
-        J14_1v2i  = assign(n, d.get("1V2_current_J14"))
-        J15_1v2i  = assign(n, d.get("1V2_current_J15"))
-        J14_1v2v  = assign(n, d.get("1V2_voltage_J14"))
-        J15_1v2v  = assign(n, d.get("1V2_voltage_J15"))
+        J15_3v3s  = assign(n, d.get("3V3_bkp_J15"))
+        J15_1v2is = assign(n, d.get("1V2_current_J15"))
+        J15_1v2vs = assign(n, d.get("1V2_voltage_J15"))
+
         sfp_rxs   = assign(n, d.get("fec-sfp_rx_power"))
         sfp_txs   = assign(n, d.get("fec-sfp_tx_power"))
         if x < 1509640201:
-            powers = assign(n, d.get("Power"))
+            powers0 = assign(n, d.get("Power"))
         else:
-            powers = assign(n, d.get("Power0"))
+            powers0 = assign(n, d.get("Power0"))
+        powers1 = assign(n, d.get("Power1"))
 
         # hack for backward compatibility with 2-fiber setup
         if J15_rssis.count(None) == (n - 2):
@@ -193,23 +215,45 @@ def main(fileName, n=18):
             sfp_txs   = [None] * 6 + sfp_txs[:2]   + [None] * (n - 8)
 
         for i in range(n):
-            j14 = J14_rssis[i]
-            j15 = J15_rssis[i]
+            j14_rssi = J14_rssis[i]
+            j14_3v3  = J14_3v3s[i]
+            j14_1v2i = J14_1v2is[i]
+            j14_1v2v = J14_1v2vs[i]
+
+            j15_rssi = J15_rssis[i]
+            j15_3v3  = J15_3v3s[i]
+            j15_1v2i = J15_1v2is[i]
+            j15_1v2v = J15_1v2vs[i]
+
             sfp_rx = sfp_rxs[i]
             sfp_tx = sfp_txs[i]
             if i < 8:  # note reversal etc.
-                uhtr = powers[8 - i - 1]
+                uhtr = powers0[8 - i - 1]
+            elif powers1:
+                uhtr = powers1[i - 8]
             else:
                 uhtr = None
 
             if i < 6 and x < 1506.45e6:
                 continue  # uHTR was occassionally measuring data fibers, not control fibers
 
-            if j15 is not None and 3.0e-6 < j15 < 0.5e-3:
-                J15s[i].SetPoint(J15s[i].GetN(), x, j15 / rFact)
+            if j15_rssi is not None and 3.0e-6 < j15_rssi < 0.5e-3:
+                J15_rssi[i].SetPoint(J15_rssi[i].GetN(), x, j15_rssi / rFact)
+            if j15_3v3:
+                J15_3v3[i].SetPoint(J15_3v3[i].GetN(), x, j15_3v3)
+            if j15_1v2i:
+                J15_1v2i[i].SetPoint(J15_1v2i[i].GetN(), x, j15_1v2i)
+            if j15_1v2v:
+                J15_1v2v[i].SetPoint(J15_1v2v[i].GetN(), x, j15_1v2v)
 
-            if j14 is not None and 0.05e-3 < j14 < 0.5e-3:
-                J14s[i].SetPoint(J14s[i].GetN(), x, j14 / rFact)
+            if j14_rssi is not None and 0.05e-3 < j14_rssi < 0.5e-3:
+                J14_rssi[i].SetPoint(J14_rssi[i].GetN(), x, j14_rssi / rFact)
+            if j14_3v3:
+                J14_3v3[i].SetPoint(J14_3v3[i].GetN(), x, j14_3v3)
+            if j14_1v2i:
+                J14_1v2i[i].SetPoint(J14_1v2i[i].GetN(), x, j14_1v2i)
+            if j14_1v2v:
+                J14_1v2v[i].SetPoint(J14_1v2v[i].GetN(), x, j14_1v2v)
 
             if sfp_rx is not None and 0.01 < (sfp_rx / sFact):
                 sr[i].SetPoint(sr[i].GetN(), x, sfp_rx / sFact)
@@ -226,14 +270,16 @@ def main(fileName, n=18):
 
 
     can = r.TCanvas()
-    pdf = fileName.replace(".log", ".pdf")
-    can.Print(pdf + "[")
     can.SetTickx()
     can.SetTicky()
     can.SetGridy()
 
     # h = r.TH2D("null", ";date;various;", 1, 1516.9e6, 1518e6, 1, 0.0, 0.7) # Get
-    h = r.TH2D("null", ";date;;", 1, 1505.8e6, 1511.0e6, 1, 0.0, 0.7) # Convert
+    if hem:
+        h = r.TH2D("null", ";date;;", 100, 1505.8e6, hemEnd, 50, 0.0, 5.0) # Convert
+    else:
+        h = r.TH2D("null", ";date;;", 100, hemEnd, 1513.0e6, 50, 0.0, 5.0) # Convert
+
     h.SetStats(False)
     xaxis = h.GetXaxis()
     xaxis.SetTimeFormat("%m-%d")
@@ -246,10 +292,27 @@ def main(fileName, n=18):
     yaxis.SetLabelSize(1.5 * yaxis.GetLabelSize())
 
     # page1(h, J15s[6], J15s[7], s[6], s[7], f[6], f[7], can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(0,  7, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(8, 15, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
-    multi(16, 17, h, J15s, J14s, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29)
 
+    pdfStem = fileName.replace(".log", ".hem" if hem else ".hep")
+    pdf = pdfStem + ".pdf"
+    can.Print(pdf + "[")
+    multi( 0,  7, h, J15_rssi, J14_rssi, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=0.7)
+    multi( 8, 15, h, J15_rssi, J14_rssi, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=0.7)
+    multi(16, 17, h, J15_rssi, J14_rssi, st, f, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=0.7)
+    can.Print(pdf + "]")
+
+    pdf = pdfStem + ".j14.pdf"
+    can.Print(pdf + "[")
+    multi( 0,  7, h, J14_rssi, J14_3v3, J14_1v2i, J14_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
+    multi( 8, 15, h, J14_rssi, J14_3v3, J14_1v2i, J14_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
+    multi(16, 17, h, J14_rssi, J14_3v3, J14_1v2i, J14_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
+    can.Print(pdf + "]")
+
+    pdf = pdfStem + ".j15.pdf"
+    can.Print(pdf + "[")
+    multi( 0,  7, h, J15_rssi, J15_3v3, J15_1v2i, J15_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
+    multi( 8, 15, h, J15_rssi, J15_3v3, J15_1v2i, J15_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
+    multi(16, 17, h, J15_rssi, J15_3v3, J15_1v2i, J15_1v2v, can, pdf, boxYlo=0.21, boxYhi=0.29, yMax=4.0, xMin=1508.24e6)
     can.Print(pdf + "]")
 
 
@@ -270,7 +333,7 @@ def legify(leg, g, n):
     return [g2]
 
 
-def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
+def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi, yMax=None, xMin=None):
     keep = []
 
     text = r.TText()
@@ -285,6 +348,7 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
     line3 = None
     line4 = None
     line5 = None
+    line6 = None
 
     can.cd(0)
     r.gPad.Clear()
@@ -300,60 +364,67 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
         r.gPad.SetGridy()
 
         h.Draw()
+        if xMin:
+            h.GetXaxis().SetRangeUser(xMin, 9.9e99)
+        if yMax:
+            h.GetYaxis().SetRangeUser(0.0, yMax)
         draw(s, i, r.kBlack)
-        if i < 8:
-            draw(f, i, r.kOrange + 3)
+        draw(f, i, r.kOrange + 3)
         draw(J15s, i, r.kBlue)
         draw(J14s, i, r.kPink + 7)
 
         rbx = 1 + i
-        keep.append(text.DrawText(0.15, 0.89, "HE %d" % rbx))
+        keep.append(text.DrawText(0.15, 0.89, "HE%s %d" % ("M" if hem else "P", rbx)))
 
-        if rbx == 1:
+        if hem and rbx == 1:
             x = 1509.71e6
             line.SetLineStyle(3)
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line4 = keep[-1]
             line4.SetLineColor(r.kGreen)
 
-        if 1 <= rbx <= 2:
+        if hem and 1 <= rbx <= 2:
             x = 1508.84e6
             line.SetLineStyle(5)
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line3 = keep[-1]
 
-        if rbx == 2:
+        if hem and rbx == 2:
             x = 1507.25e6
             line.SetLineStyle(1)
             keep.append(line.DrawLine(x, 0.03, x, 0.17))
             line1 = keep[-1]
 
-        if 3 <= rbx:
+        if hem and 3 <= rbx:
             x = 1508.24e6
             line.SetLineStyle(2)
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line2 = keep[-1]
 
-        if 7 <= rbx <= 8:
+        if hem and 7 <= rbx <= 8:
             x = 1507.025e6
             line.SetLineStyle(3)
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line0 = keep[-1]
 
-        if rbx == 8:
+        if hem and rbx == 8:
             x = 1509.6e6
             line.SetLineStyle(1)
             keep.append(line.DrawLine(x, 0.03, x, 0.36))
             line5 = keep[-1]
             line5.SetLineColor(r.kGreen)
 
+        if not hem:
+            x = 1512.56e6
+            line.SetLineStyle(2)
+            keep.append(line.DrawLine(x, 0.03, x, 0.36))
+            line6 = keep[-1]
 
     can.cd(9)
     leg = r.TLegend(0.0, 0.0, 1.0, 1.0)
     # leg.SetBorderSize(0)
     keep += legify(leg, s, nLo)
-    if nLo <= 7:
-        keep += legify(leg, f, nLo)
+    keep += legify(leg, f, nLo)
     keep += legify(leg, J15s, nLo)
     keep += legify(leg, J14s, nLo)
     if line0 is not None:
@@ -363,11 +434,13 @@ def multi(nLo, nHi, h, J15s, J14s, s, f, can, pdf, boxYlo, boxYhi):
     if line2 is not None:
         leg.AddEntry(line2, "#color[%d]{%s}" % (line2.GetLineColor(), "J15 TX #rightarrow J15 RX; FEC #leftrightarrow J14"), "l")
     if line3 is not None:
-        leg.AddEntry(line3, "#color[%d]{%s}" % (line2.GetLineColor(), "J14 TX #rightarrow J14 RX; FEC #leftrightarrow J15"), "l")
+        leg.AddEntry(line3, "#color[%d]{%s}" % (line3.GetLineColor(), "J14 TX #rightarrow J14 RX; FEC #leftrightarrow J15"), "l")
     if line4 is not None:
         leg.AddEntry(line4, "#color[%d]{%s}" % (line4.GetLineColor(), "exchange CCM"), "l")
     if line5 is not None:
         leg.AddEntry(line5, "#color[%d]{%s}" % (line5.GetLineColor(), "reassemble CCM"), "l")
+    if line6 is not None:
+        leg.AddEntry(line6, "#color[%d]{%s}" % (line6.GetLineColor(), "J15 TX #rightarrow J15 RX; FEC #leftrightarrow J14"), "l")
     leg.Draw()
 
     can.Print(pdf)
@@ -424,7 +497,8 @@ def page1(h, r7, r8, s7, s8, f0, f1, can, pdf, boxYlo, boxYhi):
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
     r.gErrorIgnoreLevel = r.kWarning
-
+    hem = False
+    hemEnd = 1510.5e6
     if len(sys.argv) < 2 or not sys.argv[1].endswith(".log"):
         sys.exit("Please provide an argument ending with .log, e.g. powerMon.log")
     main(sys.argv[1])
