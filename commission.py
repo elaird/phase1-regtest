@@ -5,14 +5,15 @@ import datetime, optparse, os, sys, time
 
 
 def check_target(rbx, b904=False):
+    if rbx == "HECRF":
+        return
+
     if not rbx.startswith("HE"):
         sys.exit("This script only works with HE RBXes.")
 
-    if (not b904) and (rbx[2] not in "MP") and (rbx[2:] != "CRF"):
+    if (not b904) and (rbx[2] not in "MP"):
         sys.exit("This script only works with HEP or HEM RBXes.")
 
-    if rbx == "HECRF":
-        return
     try:
         if b904:
             s = rbx[2:]
