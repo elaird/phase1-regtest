@@ -1,13 +1,11 @@
 #!/usr/bin/env python2
 
 import ngfec, printer
+from powerMon import commandOutputFull
 import datetime, optparse, os, sys, time
 
 
-def check_target(rbx, b904=False):
-    if rbx == "HECRF":
-        return
-
+def sector(rbx, b904=False):
     if not rbx.startswith("HE"):
         sys.exit("This script only works with HE RBXes.")
 
@@ -20,6 +18,7 @@ def check_target(rbx, b904=False):
         else:
             s = rbx[3:]
         number = int(s)
+        return number
     except ValueError:
         sys.exit("RBX number '%s' cannot be converted to an integer." % s)
 
@@ -51,6 +50,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="check control link")
+    parser.add_option("--j14",
+                      dest="j14",
+                      default=False,
+                      action="store_true",
+                      help="assume that J14 is connected to FEC")
     parser.add_option("--qiecards",
                       dest="qiecards",
                       default=False,
@@ -61,6 +65,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="check bias voltage")
+    parser.add_option("--uhtr",
+                      dest="uhtr",
+                      default=False,
+                      action="store_true",
+                      help="check data links with uHTRtool.exe")
     parser.add_option("--enable",
                       dest="enable",
                       default=False,
@@ -78,9 +87,9 @@ def opts():
 
 class commissioner:
     def __init__(self, options, target):
-        check_target(target, "904" in options.host)
         self.options = options
         self.rbx = target
+        self.sector = sector(target, "904" in options.host)
 
         self.connect()
 
@@ -99,15 +108,23 @@ class commissioner:
         if options.bv:
             self.bv()
 
+        if options.uhtr:
+            self.uhtr()
         # if options.peltier:
         #     self.peltier()
 
 
     def ccm(self):
-        self.check([("mezz_GEO_ADDR", 2, None),
-                    ("mezz_FPGA_SILSIG", 0x17092803, None),
-                    ("smezz_FPGA_SILSIG", 0x17092813, None),
-                ])
+        if self.options.j14:
+            self.check([("mezz_GEO_ADDR", 1, None),
+                        ("mezz_FPGA_SILSIG", 0x17092813, None),
+                        ("smezz_FPGA_SILSIG", 0x17092803, None),
+                    ])
+        else:
+            self.check([("mezz_GEO_ADDR", 2, None),
+                        ("mezz_FPGA_SILSIG", 0x17092803, None),
+                        ("smezz_FPGA_SILSIG", 0x17092813, None),
+                    ])
         self.errors()
 
 
@@ -141,6 +158,31 @@ class commissioner:
                 items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
         items.append(("pulser-fpga", 6, None))
         self.check(items)
+
+
+    def uhtr(self):
+        # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
+        end = ["M", "P"].index(self.rbx[2])
+        if self.sector == 18:
+            index = 0
+        else:
+            index = self.sector / 2
+        crate = [30, 24, 20,  21,  25, 31, 35, 37, 34, 30][index]
+        slot1 = 6 * end + 3 * (self.sector % 2) + 2
+
+        lines = []
+        for slot in [slot1, slot1 + 1]:
+            print "Crate %d Slot %d" % (crate, slot)
+            cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD1 -A 11" % (crate, slot)
+            lines += commandOutputFull(cmd)["stdout"].split("\n")
+
+            if slot != slot1:
+                cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD0 -A 11" % (crate, slot)
+                lines += commandOutputFull(cmd)["stdout"].split("\n")
+
+            for line in lines:
+                print line
+                # print line[19:]
 
 
     def connect(self):
@@ -243,5 +285,6 @@ if __name__ == "__main__":
     # CCM: b2b errors
     # FEC: clock status etc.
     # data links: uHTRtool 
+    # Crate 38 fibers
     # peltier voltage and current
     ###############################
