@@ -70,6 +70,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="check data links with uHTRtool.exe")
+    parser.add_option("--continue",
+                      dest="keepgoing",
+                      default=False,
+                      action="store_true",
+                      help="continue even when encountering error condions")
     parser.add_option("--enable",
                       dest="enable",
                       default=False,
@@ -112,6 +117,8 @@ class commissioner:
             self.uhtr()
         # if options.peltier:
         #     self.peltier()
+
+        self.disconnect()
 
 
     def ccm(self):
@@ -162,27 +169,39 @@ class commissioner:
 
     def uhtr(self):
         # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
+        crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
         end = ["M", "P"].index(self.rbx[2])
         if self.sector == 18:
             index = 0
         else:
             index = self.sector / 2
-        crate = [30, 24, 20,  21,  25, 31, 35, 37, 34, 30][index]
+
+        try:
+            crate = crates[index]
+        except IndexError:
+            printer.error("Could not find uHTR reading out %s" % self.rbx)
+            return
+
         slot1 = 6 * end + 3 * (self.sector % 2) + 2
 
         lines = []
         for slot in [slot1, slot1 + 1]:
             print "Crate %d Slot %d" % (crate, slot)
             cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD1 -A 11" % (crate, slot)
-            lines += commandOutputFull(cmd)["stdout"].split("\n")
+            lines1 = commandOutputFull(cmd)["stdout"].split("\n")
+            for line in lines1:
+                print line
+            lines += lines1
 
             if slot != slot1:
                 cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD0 -A 11" % (crate, slot)
-                lines += commandOutputFull(cmd)["stdout"].split("\n")
+                lines2 = commandOutputFull(cmd)["stdout"].split("\n")
+                for line in lines2:
+                    print line
+                lines += lines2
 
-            for line in lines:
-                print line
-                # print line[19:]
+            # for line in lines:
+            #     print line[19:]
 
 
     def connect(self):
@@ -224,6 +243,7 @@ class commissioner:
         try:
             result = int(res1, 16 if res1.startswith("0x") else 10)
         except ValueError:
+            result = None
             self.bail([res, "Could not convert '%s' to an integer." % res1])
 
         if result != expected:
@@ -239,6 +259,7 @@ class commissioner:
         try:
             results = [float(x) for x in res1]
         except ValueError:
+            results = []
             self.bail([res, "Could not convert all of these to floats:\n%s" % str(res1)])
 
         for result in results:
@@ -272,8 +293,9 @@ class commissioner:
     def bail(self, lines=None):
         if lines:
             printer.red("\n".join(lines))
-        self.disconnect()
-        sys.exit(" " if lines else "")
+        if not self.options.keepgoing:
+            self.disconnect()
+            sys.exit(" " if lines else "")
 
 
 if __name__ == "__main__":
