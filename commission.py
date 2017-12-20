@@ -142,6 +142,24 @@ class commissioner:
 
 
     def fec(self):
+        if self.rbx[2] != "P":
+            self.bail(["fec() does not yet support HEM"])
+
+        if 1 <= self.sector <= 6:
+            fecs = "hefec1"
+        elif 7 <= self.sector <= 12:
+            fecs = "hefec2"
+        elif 13 <= self.sector <= 18:
+            fecs = "hefec3"
+        else:
+            fecs = "unknown"
+
+        self.check([("fec_ver_major_rr", 3, None),
+                    ("fec_ver_minor_rr", 1, None),
+                    ("fec_ver_build_rr", 2, None),
+                    ("fec_firmware_date_rr", 0x29112017, None),
+                ], device=fecs)
+
         self.check([("fec-sfp_rx_power_f", 450.0, 150.0),
                     ("fec-sfp_tx_power_f", 450.0, 150.0),
                     ])
@@ -254,9 +272,12 @@ class commissioner:
         return ngfec.command(self.server, cmd)[0]
 
 
-    def check(self, items):
+    def check(self, items, device=None):
         for item, expected, threshold in items:
-            res = self.command("get %s-%s" % (self.rbx, item))
+            if device is None:
+                res = self.command("get %s-%s" % (self.rbx, item))
+            else:
+                res = self.command("get %s-%s" % (device, item))
             if threshold is None:
                 self.compare(res, expected)
             else:
