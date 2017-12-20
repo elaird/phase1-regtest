@@ -138,7 +138,7 @@ class commissioner:
     def bv(self):
         items = []
         for iRm in range(1, 5):
-            items.append(("%d-BVin_f_rr" % iRm, 100.0, 1.0))
+            items.append(("%d-BVin_f_rr" % iRm, 100.0, 4.0))
         self.check(items)
 
         for value in [0.0, 67.0]:
