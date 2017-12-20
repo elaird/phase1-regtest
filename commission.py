@@ -45,6 +45,16 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
+    parser.add_option("--fec",
+                      dest="fec",
+                      default=False,
+                      action="store_true",
+                      help="check status of FEC")
+    parser.add_option("--guardians",
+                      dest="guardians",
+                      default=False,
+                      action="store_true",
+                      help="check status of ngCCMserver guardians")
     parser.add_option("--ccm",
                       dest="ccm",
                       default=False,
@@ -101,6 +111,12 @@ class commissioner:
         if self.options.enable:
             self.enable()
 
+        if options.guardians:
+            self.guardians()
+
+        if options.fec:
+            self.fec()
+
         if options.ccm:
             self.ccm()
 
@@ -119,6 +135,16 @@ class commissioner:
         #     self.peltier()
 
         self.disconnect()
+
+
+    def guardians(self):
+        print self.command("table\ntget %s-lg fns3G" % self.rbx)
+
+
+    def fec(self):
+        self.check([("fec-sfp_rx_power_f", 450.0, 150.0),
+                    ("fec-sfp_tx_power_f", 450.0, 150.0),
+                    ])
 
 
     def ccm(self):
@@ -264,7 +290,7 @@ class commissioner:
 
         for result in results:
             if threshold < abs(result - expected):
-                self.bail(["Expected %s +- %f: " % (str(expected), threshold), res])
+                self.bail(["Expected %s +- %5.1f: " % (str(expected), threshold), res])
 
 
     def enable(self):
@@ -307,6 +333,6 @@ if __name__ == "__main__":
     # CCM: b2b errors
     # FEC: clock status etc.
     # data links: uHTRtool 
-    # Crate 38 fibers
+    # CU data links
     # peltier voltage and current
     ###############################
