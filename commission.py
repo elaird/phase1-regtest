@@ -100,6 +100,18 @@ def opts():
     return options, args[0]
 
 
+def uhtr_tool_link_status(crate, slot1):
+    lines = {}
+    for slot in [slot1, slot1 + 1]:
+        for ppod in range(2):
+            if slot == slot1 and ppod == 1:
+                continue
+
+            cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD%d -A 11" % (crate, slot, ppod)
+            lines[(crate, slot, ppod)] = commandOutputFull(cmd)["stdout"]
+    return lines
+
+
 class commissioner:
     def __init__(self, options, target):
         self.options = options
@@ -212,40 +224,61 @@ class commissioner:
 
 
     def uhtr(self):
-        # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
-        crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
-        end = ["M", "P"].index(self.rbx[2])
-        if self.sector == 18:
-            index = 0
+        if self.rbx[2] in "MP":  # USC
+            end = "MP".index(self.rbx[2])
+            if self.sector == 18:
+                index = 0
+            else:
+                index = self.sector / 2
+
+            try:
+                # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
+                crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
+                crate = crates[index]
+                slot1 = 6 * end + 3 * (self.sector % 2) + 2
+            except IndexError:
+                printer.error("Could not find uHTR reading out %s" % self.rbx)
+                return
+        else:  # 904
+            ss = self.sector - 1
+            crate = 61 + ss / 9
+            if 9 <= ss:
+                ss -= 9
+            slot1 = 1 + 4 * ss / 3
+
+        link_status = uhtr_tool_link_status(crate, slot1)
+        for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
+            print "Crate %d Slot %2d" % (crate, slot)
+            print lines
+            link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
+
+            self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
+            self.uhtr_compare(slot, ppod, bad8b10b, 0)
+            self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
+            self.uhtr_compare(slot, ppod, fifo_occ, 10, threshold=6)
+            self.uhtr_compare(slot, ppod, bprv, 0x1111)
+            self.uhtr_compare(slot, ppod, invalid, 0)
+            self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
+
+
+    def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
+        items = lst[19:].split()
+        if not (slot % 3):
+            iStart = 1
+            iEnd = 11  # FIXME: update once CU fibers are connected
         else:
-            index = self.sector / 2
+            iStart = 0
+            iEnd = 12
 
-        try:
-            crate = crates[index]
-        except IndexError:
-            printer.error("Could not find uHTR reading out %s" % self.rbx)
-            return
+        if doubled:
+            iStart *= 2
+            iEnd *= 2
 
-        slot1 = 6 * end + 3 * (self.sector % 2) + 2
-
-        lines = []
-        for slot in [slot1, slot1 + 1]:
-            print "Crate %d Slot %d" % (crate, slot)
-            cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD1 -A 11" % (crate, slot)
-            lines1 = commandOutputFull(cmd)["stdout"].split("\n")
-            for line in lines1:
-                print line
-            lines += lines1
-
-            if slot != slot1:
-                cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD0 -A 11" % (crate, slot)
-                lines2 = commandOutputFull(cmd)["stdout"].split("\n")
-                for line in lines2:
-                    print line
-                lines += lines2
-
-            # for line in lines:
-            #     print line[19:]
+        if threshold is None:
+            for i in range(iStart, iEnd):
+                self.compare("0x" + items[i], expected, strip=False, msg="%s (link %d)" % (lst[:19], 12*ppod + (i/2 if doubled else i)))
+        else:
+            self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False)
 
 
     def connect(self):
@@ -285,8 +318,12 @@ class commissioner:
             print res
 
 
-    def compare(self, res, expected):
-        res1 = res.split("#")[1].strip()
+    def compare(self, res, expected, strip=True, msg=""):
+        if strip:
+            res1 = res.split("#")[1].strip()
+        else:
+            res1 = res
+
         try:
             result = int(res1, 16 if res1.startswith("0x") else 10)
         except ValueError:
@@ -294,24 +331,32 @@ class commissioner:
             self.bail([res, "Could not convert '%s' to an integer." % res1])
 
         if result != expected:
-            self.bail(["Expected %s: " % str(expected), res])
+            lines = ["Expected %s: " % str(expected), res]
+            if msg:
+                lines.insert(0, msg)
+            self.bail(lines)
 
 
-    def compare_with_threshold(self, res, expected, threshold):
-        res1 = res.split("#")[1].strip()
+    def compare_with_threshold(self, res, expected, threshold, strip=True):
+        if strip:
+            res1 = res.split("#")[1].strip()
+        else:
+            res1 = res
+
         if " " in res1:
             res1 = res1.split()
-        else:
+        elif type(res1) is not list:
             res1 = [res1]
+
         try:
             results = [float(x) for x in res1]
         except ValueError:
             results = []
-            self.bail([res, "Could not convert all of these to floats:\n%s" % str(res1)])
+            self.bail([str(res), "Could not convert all of these to floats:\n%s" % str(res1)])
 
         for result in results:
             if threshold < abs(result - expected):
-                self.bail(["Expected %s +- %5.1f: " % (str(expected), threshold), res])
+                self.bail(["Expected %s +- %5.1f: " % (str(expected), threshold), str(res)])
 
 
     def enable(self):
@@ -353,7 +398,6 @@ if __name__ == "__main__":
     # QIE11
     # CCM: b2b errors
     # FEC: clock status etc.
-    # data links: uHTRtool 
     # CU data links
     # peltier voltage and current
     ###############################
