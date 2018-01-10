@@ -324,7 +324,7 @@ class commissioner:
             # self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0)
             self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
-            self.uhtr_compare(slot, ppod, fifo_occ, 10, threshold=6)
+            self.uhtr_compare(slot, ppod, fifo_occ, 11, threshold=8)
             self.uhtr_compare(slot, ppod, bprv, 0x1111)
             # self.uhtr_compare(slot, ppod, invalid, 0)
             # self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
