@@ -163,7 +163,7 @@ class commissioner:
             self.bail(["fec() does not yet support HEM"])
 
         # http://cmsonline.cern.ch/cms-elog/1025354
-        sfp = 1 + self.sector % 6
+        sfp = 2 + (self.sector - 1) % 6
         if 1 <= self.sector <= 6:
             fecs = "hefec1"
         elif 7 <= self.sector <= 12:
@@ -260,31 +260,33 @@ class commissioner:
                     if iQieCard == 1:
                         stem = "calib"
                         stemQ = stem
+                        qie = "QIE[1-12]"
                     else:
                         continue
                 else:
                     stem = "%d-%d" % (iRm, iQieCard)
                     stemQ = "%d" % iRm
+                    qie = "QIE[1-48]"
 
                 items.append(("%s-i_FPGA_MAJOR_VERSION_rr" % stem, 3, None))
                 items.append(("%s-i_FPGA_MINOR_VERSION_rr" % stem, 9, None))
                 # items.append(("%s-i_scratch_rr" % stem, None, None))
                 # items.append(("%s-i_WTE_count_rr" % stem, None, None))
 
-                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
-                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
+                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 2 if self.rbx == "HEP17" else 4, None))
+                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 3 if self.rbx == "HEP17" else 2, None))
                 # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
                 # items.append(("%s-B_SCRATCH_rr" % stem, None, None))
                 # items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
                 # items.append(("%s-B_SHT_temp_f_rr" % stem, 25.0, 5.0))
                 # items.append(("%s-B_SHT_rh_f_rr" % stem, 5.0, 5.0))
 
-            items.append(("%s-QIE[1-48]_Gsel_rr" % stemQ, None, None))
-            items.append(("%s-QIE[1-48]_PedestalDAC_rr" % stemQ, None, None))
-            items.append(("%s-QIE[1-48]_CapID0pedestal_rr" % stemQ, None, None))
-            items.append(("%s-QIE[1-48]_CapID1pedestal_rr" % stemQ, None, None))
-            items.append(("%s-QIE[1-48]_CapID2pedestal_rr" % stemQ, None, None))
-            items.append(("%s-QIE[1-48]_CapID3pedestal_rr" % stemQ, None, None))
+            # items.append(("%s-%s_Gsel_rr" % (stemQ, qie), None, None))
+            # items.append(("%s-%s_PedestalDAC_rr" % (stemQ, qie), None, None))
+            # items.append(("%s-%s_CapID0pedestal_rr" % (stemQ, qie), None, None))
+            # items.append(("%s-%s_CapID1pedestal_rr" % (stemQ, qie), None, None))
+            # items.append(("%s-%s_CapID2pedestal_rr" % (stemQ, qie), None, None))
+            # items.append(("%s-%s_CapID3pedestal_rr" % (stemQ, qie), None, None))
         items.append(("pulser-fpga", 6, None))
         self.check(items)
 
