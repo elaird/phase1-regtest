@@ -233,12 +233,16 @@ class commissioner:
 
     def bv(self):
         for iRm in range(1, 5):
+            print self.command("get %s-%d-PeltierVoltage_f_rr" % (self.rbx, iRm))
+            print self.command("get %s-%d-PeltierCurrent_f_rr" % (self.rbx, iRm))
+            if not self.options.set_bv:
+                print self.command("get %s-%d-biasmon[1-48]_f_rr" % (self.rbx, iRm))
+
             items = [("%d-BVin_f_rr" % iRm, 100.0, 4.0),
-                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 1.0, 0.0),
-                     ("%d-temperature_f" % iRm, None, None),
-                     ("%d-humidityS_f_rr" % iRm, None, None),
-                     ("%d-PeltierVoltage_f_rr" % iRm, None, None),
-                     ("%d-PeltierCurrent_f_rr" % iRm, None, None),
+                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.0, 6.0),
+                     ("%d-rtdtemperature_f" % iRm, 18.0, 2.0),
+                     ("%d-temperature_f" % iRm, 18.0, 2.0),
+                     ("%d-humidityS_f_rr" % iRm, 10.0, 10.0),
                  ]
             self.check(items)
 
@@ -247,9 +251,6 @@ class commissioner:
                 for iRm in range(1, 5):
                     print self.command("put %s-%d-biasvoltage[1-48]_f 48*%3.1f" % (self.rbx, iRm, value))
                     self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
-        else:
-            for iRm in range(1, 5):
-                self.check([("%d-biasmon[1-48]_f_rr" % iRm, None, None)])
 
 
     def qiecards(self):
