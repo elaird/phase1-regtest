@@ -344,7 +344,7 @@ class commissioner:
             for i in range(iStart, iEnd):
                 self.compare("0x" + items[i], expected, strip=False, msg="%s (link %d)" % (lst[:19], 12*ppod + (i/2 if doubled else i)))
         else:
-            self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False)
+            self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False, msg=lst[:19].strip())
 
 
     def connect(self):
@@ -403,7 +403,7 @@ class commissioner:
             self.bail(lines)
 
 
-    def compare_with_threshold(self, res, expected, threshold, strip=True):
+    def compare_with_threshold(self, res, expected, threshold, strip=True, msg=""):
         if strip:
             res1 = res.split("#")[1].strip()
         else:
@@ -425,7 +425,10 @@ class commissioner:
 
         for result in results:
             if threshold < abs(result - expected):
-                self.bail(["Expected %s +- %5.1f: " % (str(expected), threshold), str(res)])
+                lines = ["Expected %s +- %5.1f: " % (str(expected), threshold), str(res)]
+                if msg:
+                    lines.insert(0, msg)
+                self.bail(lines)
 
 
     def enable(self):
