@@ -109,10 +109,10 @@ def uhtr_tool_link_status(crate, slot1):
     lines = {}
     for slot in [slot1, slot1 + 1]:
         for ppod in range(2):
-            if slot == slot1 and ppod == 1:
+            if slot == slot1 and not ppod:
                 continue
 
-            cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep PPOD%d -A 11" % (crate, slot, ppod)
+            cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep '^PPOD%d' -A 11" % (crate, slot, ppod)
             lines[(crate, slot, ppod)] = commandOutputFull(cmd)["stdout"]
     return lines
 
@@ -320,13 +320,13 @@ class commissioner:
             print lines
             link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
 
-            self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
+            # self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0)
             self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
             self.uhtr_compare(slot, ppod, fifo_occ, 10, threshold=6)
             self.uhtr_compare(slot, ppod, bprv, 0x1111)
-            self.uhtr_compare(slot, ppod, invalid, 0)
-            self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
+            # self.uhtr_compare(slot, ppod, invalid, 0)
+            # self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
 
 
     def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
