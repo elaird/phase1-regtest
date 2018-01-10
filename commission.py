@@ -75,6 +75,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="check bias voltage")
+    parser.add_option("--set-bv",
+                      dest="set_bv",
+                      default=False,
+                      action="store_true",
+                      help="set test values of bias voltages")
     parser.add_option("--uhtr",
                       dest="uhtr",
                       default=False,
@@ -189,29 +194,62 @@ class commissioner:
 
 
     def ccm(self):
+        fw14 = 0x17092813
+        fw15 = 0x17092803
+        current = 0.3
+        currentE = 0.1
         if self.options.j14:
-            self.check([("mezz_GEO_ADDR", 1, None),
-                        ("mezz_FPGA_SILSIG", 0x17092813, None),
-                        ("smezz_FPGA_SILSIG", 0x17092803, None),
-                    ])
+            lst = [("mezz_GEO_ADDR", 1, None),
+                   ("mezz_FPGA_SILSIG", fw14, None),
+                   ("smezz_FPGA_SILSIG", fw15, None),
+                   ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
+            ]
         else:
-            self.check([("mezz_GEO_ADDR", 2, None),
-                        ("mezz_FPGA_SILSIG", 0x17092803, None),
-                        ("smezz_FPGA_SILSIG", 0x17092813, None),
-                    ])
+            lst = [("mezz_GEO_ADDR", 2, None),
+                   ("mezz_FPGA_SILSIG", fw15, None),
+                   ("smezz_FPGA_SILSIG", fw14, None),
+                   ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
+            ]
+
+        temp = 35.0
+        tempE = 5.0
+        lst += [# ("temp_J13_Clk_U10_f_rr", temp, tempE),
+                # ("temp_J13_Clk_U11_f_rr", temp, tempE),
+                # ("temp_J14_Ctrl_U18_f_rr", temp, tempE),
+                # ("temp_J14_Ctrl_U19_f_rr", temp, tempE),
+                # ("temp_J15_Ctrl_U18_f_rr", temp, tempE),
+                # ("temp_J15_Ctrl_U19_f_rr", temp, tempE),
+                # ("temp_J16_Clk_U10_f_rr", temp, tempE),
+                # ("temp_J16_Clk_U11_f_rr", temp, tempE),
+                # ("J13_Clk_1w_f", None, None),
+                # ("J14_Cntrl_1w_f", None, None),
+                # ("J15_Cntrl_1w_f", None, None),
+                # ("J16_Clk_1w_f", None, None),
+            ]
+
+        self.check(lst)
         self.errors()
 
 
     def bv(self):
         for iRm in range(1, 5):
-            items = []
-            items.append(("%d-BVin_f_rr" % iRm, 100.0, 4.0))
+            items = [("%d-BVin_f_rr" % iRm, 100.0, 4.0),
+                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 1.0, 0.0),
+                     ("%d-temperature_f" % iRm, None, None),
+                     ("%d-humidityS_f_rr" % iRm, None, None),
+                     ("%d-PeltierVoltage_f_rr" % iRm, None, None),
+                     ("%d-PeltierCurrent_f_rr" % iRm, None, None),
+                 ]
             self.check(items)
 
-        for value in [0.0, 67.0]:
+        if self.options.set_bv:
+            for value in [0.0, 67.0]:
+                for iRm in range(1, 5):
+                    print self.command("put %s-%d-biasvoltage[1-48]_f 48*%3.1f" % (self.rbx, iRm, value))
+                    self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
+        else:
             for iRm in range(1, 5):
-                print self.command("put %s-%d-biasvoltage[1-48]_f 48*%3.1f" % (self.rbx, iRm, value))
-                self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
+                self.check([("%d-biasmon[1-48]_f_rr" % iRm, None, None)])
 
 
     def qiecards(self):
