@@ -157,6 +157,8 @@ class commissioner:
         if self.rbx[2] != "P":
             self.bail(["fec() does not yet support HEM"])
 
+        # http://cmsonline.cern.ch/cms-elog/1025354
+        sfp = 1 + self.sector % 6
         if 1 <= self.sector <= 6:
             fecs = "hefec1"
         elif 7 <= self.sector <= 12:
@@ -170,6 +172,15 @@ class commissioner:
                     ("fec_ver_minor_rr", 1, None),
                     ("fec_ver_build_rr", 2, None),
                     ("fec_firmware_date_rr", 0x29112017, None),
+                    ("LHC_clk_freq_rr", 0x61d90, 10),
+                    ("sfp%d_status.TxFault_rr" % sfp, 0, None),
+                    ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
+                    # SinErr_cnt_rr
+                    # DbErr_cnt_rr
+                    # qie_reset_cnt_rr
+                    # qie_reset_early_cnt_rr
+                    # qie_reset_late_cnt_rr
+                    # qie_reset_ontime_cnt_rr
                 ], device=fecs)
 
         self.check([("fec-sfp_rx_power_f", 450.0, 150.0),
@@ -192,10 +203,10 @@ class commissioner:
 
 
     def bv(self):
-        items = []
         for iRm in range(1, 5):
+            items = []
             items.append(("%d-BVin_f_rr" % iRm, 100.0, 4.0))
-        self.check(items)
+            self.check(items)
 
         for value in [0.0, 67.0]:
             for iRm in range(1, 5):
@@ -210,15 +221,32 @@ class commissioner:
                 if iRm == 5:
                     if iQieCard == 1:
                         stem = "calib"
+                        stemQ = stem
                     else:
                         continue
                 else:
                     stem = "%d-%d" % (iRm, iQieCard)
+                    stemQ = "%d" % iRm
 
                 items.append(("%s-i_FPGA_MAJOR_VERSION_rr" % stem, 3, None))
                 items.append(("%s-i_FPGA_MINOR_VERSION_rr" % stem, 9, None))
+                # items.append(("%s-i_scratch_rr" % stem, None, None))
+                # items.append(("%s-i_WTE_count_rr" % stem, None, None))
+
                 items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
                 items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
+                # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
+                # items.append(("%s-B_SCRATCH_rr" % stem, None, None))
+                # items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
+                # items.append(("%s-B_SHT_temp_f_rr" % stem, 25.0, 5.0))
+                # items.append(("%s-B_SHT_rh_f_rr" % stem, 5.0, 5.0))
+
+            items.append(("%s-QIE[1-48]_Gsel_rr" % stemQ, None, None))
+            items.append(("%s-QIE[1-48]_PedestalDAC_rr" % stemQ, None, None))
+            items.append(("%s-QIE[1-48]_CapID0pedestal_rr" % stemQ, None, None))
+            items.append(("%s-QIE[1-48]_CapID1pedestal_rr" % stemQ, None, None))
+            items.append(("%s-QIE[1-48]_CapID2pedestal_rr" % stemQ, None, None))
+            items.append(("%s-QIE[1-48]_CapID3pedestal_rr" % stemQ, None, None))
         items.append(("pulser-fpga", 6, None))
         self.check(items)
 
@@ -330,7 +358,7 @@ class commissioner:
             result = None
             self.bail([res, "Could not convert '%s' to an integer." % res1])
 
-        if result != expected:
+        if result != expected and expected is not None:
             lines = ["Expected %s: " % str(expected), res]
             if msg:
                 lines.insert(0, msg)
@@ -349,7 +377,10 @@ class commissioner:
             res1 = [res1]
 
         try:
-            results = [float(x) for x in res1]
+            if res1[0].startswith("0x"):
+                results = [int(x, 16) for x in res1]
+            else:
+                results = [float(x) for x in res1]
         except ValueError:
             results = []
             self.bail([str(res), "Could not convert all of these to floats:\n%s" % str(res1)])
@@ -370,16 +401,23 @@ class commissioner:
         print("Reading control link error counters (integrating for %d seconds)" % self.options.nSeconds)
         fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.rbx
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
+        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
+
         fec1 = self.command(fec)
         ccm1 = self.command(ccm)
+        b2b1 = self.command(b2b)
 
         time.sleep(self.options.nSeconds)
         fec2 = self.command(fec)
         ccm2 = self.command(ccm)
+        b2b2 = self.command(b2b)
+
         if fec1 != fec2:
             self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
         if ccm1 != ccm2:
             self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
+        if b2b1 != b2b2:
+            self.bail(["Link errors detected via CCM counters:", b2b1[0], b2b2[0]])
 
 
     def bail(self, lines=None):
@@ -395,9 +433,6 @@ if __name__ == "__main__":
 
     ###############################
     # still to be added
-    # QIE11
-    # CCM: b2b errors
-    # FEC: clock status etc.
+    # FEC link status
     # CU data links
-    # peltier voltage and current
     ###############################
