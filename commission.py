@@ -188,16 +188,16 @@ class commissioner:
                     # qie_reset_ontime_cnt_rr
                 ], device=fecs)
 
-        self.check([("fec-sfp_rx_power_f", 450.0, 150.0),
-                    ("fec-sfp_tx_power_f", 450.0, 150.0),
+        self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
+                    ("fec-sfp_tx_power_f", 550.0, 150.0),
                     ])
 
 
     def ccm(self):
         fw14 = 0x17092813
         fw15 = 0x17092803
-        current = 0.3
-        currentE = 0.1
+        current = 0.3e-3
+        currentE = 0.1e-3
         if self.options.j14:
             lst = [("mezz_GEO_ADDR", 1, None),
                    ("mezz_FPGA_SILSIG", fw14, None),
