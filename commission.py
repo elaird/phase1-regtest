@@ -196,8 +196,8 @@ class commissioner:
     def ccm(self):
         fw14 = 0x17092813
         fw15 = 0x17092803
-        current = 0.3e-3
-        currentE = 0.1e-3
+        current = 0.35e-3
+        currentE = 0.15e-3
         if self.options.j14:
             lst = [("mezz_GEO_ADDR", 1, None),
                    ("mezz_FPGA_SILSIG", fw14, None),
@@ -239,7 +239,7 @@ class commissioner:
                 print self.command("get %s-%d-biasmon[1-48]_f_rr" % (self.rbx, iRm))
 
             items = [("%d-BVin_f_rr" % iRm, 100.0, 4.0),
-                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.0, 6.0),
+                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.5, 6.5),
                      ("%d-rtdtemperature_f" % iRm, 18.0, 2.0),
                      ("%d-temperature_f" % iRm, 18.0, 2.0),
                      ("%d-humidityS_f_rr" % iRm, 10.0, 10.0),
