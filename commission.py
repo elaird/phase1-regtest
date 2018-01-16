@@ -80,6 +80,16 @@ def opts():
                       default=False,
                       action="store_true",
                       help="set test values of bias voltages")
+    parser.add_option("--get-delays",
+                      dest="get_delays",
+                      default=False,
+                      action="store_true",
+                      help="read values of QIE phase delays")
+    parser.add_option("--set-delays",
+                      dest="set_delays",
+                      default=False,
+                      action="store_true",
+                      help="set test values of QIE phase delays")
     parser.add_option("--uhtr",
                       dest="uhtr",
                       default=False,
@@ -142,6 +152,9 @@ class commissioner:
 
         if options.qiecards:
             self.qiecards()
+
+        if options.get_delays or options.set_delays:
+            self.set_delays(put=options.set_delays)
 
         if options.bv:
             self.bv()
@@ -290,6 +303,29 @@ class commissioner:
             # items.append(("%s-%s_CapID3pedestal_rr" % (stemQ, qie), None, None))
         items.append(("pulser-fpga", 6, None))
         self.check(items)
+
+
+    def set_delays(self, put=True):
+        for iRm in range(1, 6):
+            for iQieCard in range(1, 5):
+                if iRm == 5:
+                    if iQieCard == 1:
+                        stem = "calib"
+                        stemQ = stem
+                        qie = "QIE[1-12]"
+                        nQie = 12
+                    else:
+                        continue
+                else:
+                    stem = "%d-%d" % (iRm, iQieCard)
+                    stemQ = "%d" % iRm
+                    qie = "QIE[1-48]"
+                    nQie = 48
+
+            if put:
+                print self.command("put %s-%s-%s_PhaseDelay %d*64" % (self.rbx, stemQ, qie, nQie))
+            else:
+                print self.command("get %s-%s-%s_PhaseDelay_rr" % (self.rbx, stemQ, qie))
 
 
     def uhtr(self):
