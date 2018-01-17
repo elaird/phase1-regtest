@@ -287,8 +287,8 @@ class commissioner:
                 # items.append(("%s-i_scratch_rr" % stem, None, None))
                 # items.append(("%s-i_WTE_count_rr" % stem, None, None))
 
-                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 2 if self.rbx == "HEP17" else 4, None))
-                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 3 if self.rbx == "HEP17" else 2, None))
+                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
+                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
                 # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
                 # items.append(("%s-B_SCRATCH_rr" % stem, None, None))
                 # items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
