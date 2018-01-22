@@ -70,6 +70,16 @@ def opts():
                       default=False,
                       action="store_true",
                       help="check QIE cards")
+    parser.add_option("--qiecards-full",
+                      dest="qiecardsfull",
+                      default=False,
+                      action="store_true",
+                      help="check QIE cards, more registers")
+    parser.add_option("--qiecards-humid",
+                      dest="qiecardshumid",
+                      default=False,
+                      action="store_true",
+                      help="check QIE card humidity sensors")
     parser.add_option("--bv",
                       dest="bv",
                       default=False,
@@ -147,11 +157,17 @@ class commissioner:
         if options.ccm:
             self.ccm()
 
-        if options.qiecards or options.bv:
+        if options.qiecards or options.qiecardsfull or options.bv:
             self.check([("bkp_pwr_bad_rr", 0, None)])
 
         if options.qiecards:
             self.qiecards()
+
+        if options.qiecardsfull:
+            self.qiecards(True)
+
+        if options.qiecardshumid:
+            self.qiecards_humidity()
 
         if options.get_delays or options.set_delays:
             self.set_delays(put=options.set_delays)
@@ -266,7 +282,7 @@ class commissioner:
                     self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
 
 
-    def qiecards(self):
+    def qiecards(self, full = False):
         items = []
         for iRm in range(1, 6):
             for iQieCard in range(1, 5):
@@ -284,16 +300,22 @@ class commissioner:
 
                 items.append(("%s-i_FPGA_MAJOR_VERSION_rr" % stem, 3, None))
                 items.append(("%s-i_FPGA_MINOR_VERSION_rr" % stem, 9, None))
-                # items.append(("%s-i_scratch_rr" % stem, None, None))
-                # items.append(("%s-i_WTE_count_rr" % stem, None, None))
+                if full:
+                    items.append(("%s-i_scratch_rr" % stem, None, None))
+                    items.append(("%s-i_WTE_count_rr" % stem, None, None))
+                    items.append(("%s-i_Clk_count_rr" % stem, None, None))
+                    items.append(("%s-i_bc0_status_count_a_rr" % stem, None, None))
 
                 items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
                 items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
-                # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
-                # items.append(("%s-B_SCRATCH_rr" % stem, None, None))
-                # items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
-                # items.append(("%s-B_SHT_temp_f_rr" % stem, 25.0, 5.0))
-                # items.append(("%s-B_SHT_rh_f_rr" % stem, 5.0, 5.0))
+                if full:
+                    items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
+                    items.append(("%s-B_bc0_status_count" % stem, None, None))
+                    # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
+                    items.append(("%s-B_SCRATCH_rr" % stem, None, None))
+                    items.append(("%s-B_SHT_temp_f_rr" % stem, 27.0, 7.0))
+                    items.append(("%s-UniqueID_rr" % stem, None, None))
+                    #items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
 
             # items.append(("%s-%s_Gsel_rr" % (stemQ, qie), None, None))
             # items.append(("%s-%s_PedestalDAC_rr" % (stemQ, qie), None, None))
@@ -302,6 +324,26 @@ class commissioner:
             # items.append(("%s-%s_CapID2pedestal_rr" % (stemQ, qie), None, None))
             # items.append(("%s-%s_CapID3pedestal_rr" % (stemQ, qie), None, None))
         items.append(("pulser-fpga", 6, None))
+        self.check(items)
+
+    def qiecards_humidity(self):
+        items = []
+        for iRm in range(1, 6):
+            for iQieCard in range(1, 5):
+                if iRm == 5:
+                    if iQieCard == 1:
+                        stem = "calib"
+                        stemQ = stem
+                        qie = "QIE[1-12]"
+                    else:
+                        continue
+                else:
+                    stem = "%d-%d" % (iRm, iQieCard)
+                    stemQ = "%d" % iRm
+                    qie = "QIE[1-48]"
+
+                items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
+
         self.check(items)
 
 
@@ -416,10 +458,11 @@ class commissioner:
                 res = self.command("get %s-%s" % (self.rbx, item))
             else:
                 res = self.command("get %s-%s" % (device, item))
-            if threshold is None:
-                self.compare(res, expected)
-            else:
-                self.compare_with_threshold(res, expected, threshold)
+            if not expected is None:
+                if threshold is None:
+                    self.compare(res, expected)
+                else:
+                    self.compare_with_threshold(res, expected, threshold)
             print res
 
 
