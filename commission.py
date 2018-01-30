@@ -6,8 +6,8 @@ import datetime, optparse, os, sys, time
 
 
 def sector(rbx, b904=False):
-    if not rbx.startswith("HE"):
-        sys.exit("This script only works with HE RBXes.")
+    if (not rbx.startswith("HB")) and (not rbx.startswith("HE")):
+        sys.exit("This script only works with HB or HE RBXes.")
 
     if (not b904) and (rbx[2] not in "MP"):
         sys.exit("This script only works with HEP or HEM RBXes.")
@@ -125,11 +125,13 @@ def opts():
     return options, args[0]
 
 
-def uhtr_tool_link_status(crate, slot1):
+def uhtr_tool_link_status(crate, slot1, he):
     lines = {}
     for slot in [slot1, slot1 + 1]:
         for ppod in range(2):
-            if slot == slot1 and not ppod:
+            if he and slot == slot1 and not ppod:
+                continue
+            if (not he) and slot == slot1 + 1 and ppod:
                 continue
 
             cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep '^PPOD%d' -A 11" % (crate, slot, ppod)
@@ -141,6 +143,7 @@ class commissioner:
     def __init__(self, options, target):
         self.options = options
         self.rbx = target
+        self.he = self.rbx.startswith("HE")
         self.sector = sector(target, "904" in options.host)
 
         self.connect()
@@ -164,7 +167,7 @@ class commissioner:
             self.qiecards()
 
         if options.qiecardsfull:
-            self.qiecards(True)
+            self.qiecards(full=True)
 
         if options.qiecardshumid:
             self.qiecards_humidity()
@@ -282,7 +285,7 @@ class commissioner:
                     self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
 
 
-    def qiecards(self, full = False):
+    def qiecards(self, full=False):
         items = []
         for iRm in range(1, 6):
             for iQieCard in range(1, 5):
@@ -326,6 +329,7 @@ class commissioner:
         items.append(("pulser-fpga", 6, None))
         self.check(items)
 
+
     def qiecards_humidity(self):
         items = []
         for iRm in range(1, 6):
@@ -334,13 +338,11 @@ class commissioner:
                     if iQieCard == 1:
                         stem = "calib"
                         stemQ = stem
-                        qie = "QIE[1-12]"
                     else:
                         continue
                 else:
                     stem = "%d-%d" % (iRm, iQieCard)
                     stemQ = "%d" % iRm
-                    qie = "QIE[1-48]"
 
                 items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
 
@@ -370,7 +372,7 @@ class commissioner:
                 print self.command("get %s-%s-%s_PhaseDelay_rr" % (self.rbx, stemQ, qie))
 
 
-    def uhtr(self):
+    def uhtr(self, check=True):
         if self.rbx[2] in "MP":  # USC
             end = "MP".index(self.rbx[2])
             if self.sector == 18:
@@ -382,7 +384,7 @@ class commissioner:
                 # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
                 crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
                 crate = crates[index]
-                slot1 = 6 * end + 3 * (self.sector % 2) + 2
+                slot1 = 6 * end + 3 * (self.sector % 2) + 1 + int(self.he)
             except IndexError:
                 printer.error("Could not find uHTR reading out %s" % self.rbx)
                 return
@@ -393,26 +395,37 @@ class commissioner:
                 ss -= 9
             slot1 = 1 + 4 * ss / 3
 
-        link_status = uhtr_tool_link_status(crate, slot1)
+        out = []
+        link_status = uhtr_tool_link_status(crate, slot1, he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
+            link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
+            out.append((self.sector, crate, slot, ppod, self.fifo_occs(slot, ppod, fifo_occ)))
+            if not check:
+                continue
+
             print "Crate %d Slot %2d" % (crate, slot)
             print lines
-            link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
 
             # self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0)
             self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
-            self.uhtr_compare(slot, ppod, fifo_occ, 11, threshold=8)
+            self.uhtr_compare(slot, ppod, fifo_occ, 12, threshold=9)
             self.uhtr_compare(slot, ppod, bprv, 0x1111)
             # self.uhtr_compare(slot, ppod, invalid, 0)
             # self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
 
+        return out
+
 
     def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
         items = lst[19:].split()
-        if not (slot % 3):
-            iStart = 1
-            iEnd = 11  # FIXME: update once CU fibers are connected
+        if self.he:
+            if not (slot % 3):
+                iStart = 1
+                iEnd = 11  # FIXME: update once CU fibers are connected
+            else:
+                iStart = 0
+                iEnd = 12
         else:
             iStart = 0
             iEnd = 12
@@ -426,6 +439,22 @@ class commissioner:
                 self.compare("0x" + items[i], expected, strip=False, msg="%s (link %d)" % (lst[:19], 12*ppod + (i/2 if doubled else i)))
         else:
             self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False, msg=lst[:19].strip())
+
+
+    def fifo_occs(self, slot, ppod, lst):
+        items = lst[19:].split()
+
+        if (slot % 3) == 0:
+            iStart = 1
+            iEnd = 11  # FIXME: update once CU fibers are connected
+        if (slot % 3) == 1:
+            iStart = 0
+            iEnd = 12
+        if (slot % 3) == 2:
+            iStart = 1
+            iEnd = 11
+
+        return items[iStart:iEnd]
 
 
     def connect(self):
@@ -458,7 +487,7 @@ class commissioner:
                 res = self.command("get %s-%s" % (self.rbx, item))
             else:
                 res = self.command("get %s-%s" % (device, item))
-            if not expected is None:
+            if expected is not None:
                 if threshold is None:
                     self.compare(res, expected)
                 else:
