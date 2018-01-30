@@ -399,7 +399,8 @@ class commissioner:
         link_status = uhtr_tool_link_status(crate, slot1, he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
             link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
-            out.append((self.sector, crate, slot, ppod, self.fifo_occs(slot, ppod, fifo_occ)))
+            iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ)
+            out.append((self.sector, crate, slot, ppod, items[iStart:iEnd]))
             if not check:
                 continue
 
@@ -418,18 +419,7 @@ class commissioner:
 
 
     def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
-        items = lst[19:].split()
-        if self.he:
-            if not (slot % 3):
-                iStart = 1
-                iEnd = 11  # FIXME: update once CU fibers are connected
-            else:
-                iStart = 0
-                iEnd = 12
-        else:
-            iStart = 0
-            iEnd = 12
-
+        iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst)
         if doubled:
             iStart *= 2
             iEnd *= 2
@@ -441,20 +431,28 @@ class commissioner:
             self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False, msg=lst[:19].strip())
 
 
-    def fifo_occs(self, slot, ppod, lst):
+    def uhtr_range_and_items(self, slot, ppod, lst):
         items = lst[19:].split()
 
         if (slot % 3) == 0:
             iStart = 1
-            iEnd = 11  # FIXME: update once CU fibers are connected
+            iEnd = 12  # include ngHE CU fibers
         if (slot % 3) == 1:
-            iStart = 0
-            iEnd = 12
+            if ppod:
+                iStart = 0
+                iEnd = 8
+            else:
+                iStart = 4
+                iEnd = 12
         if (slot % 3) == 2:
-            iStart = 1
-            iEnd = 11
+            if ppod:
+                iStart = 0
+                iEnd = 12
+            else:
+                iStart = 2
+                iEnd = 11  # include HB CU fiber
 
-        return items[iStart:iEnd]
+        return iStart, iEnd, items
 
 
     def connect(self):
