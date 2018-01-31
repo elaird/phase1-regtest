@@ -191,17 +191,17 @@ class commissioner:
 
 
     def fec(self):
-        if self.rbx[2] != "P":
-            self.bail(["fec() does not yet support HEM"])
+        # HEP: http://cmsonline.cern.ch/cms-elog/1025354
+        # HEM: http://cmsonline.cern.ch/cms-elog/1027182
+        offset = 0 if self.rbx[2] == "P" else 3
 
-        # http://cmsonline.cern.ch/cms-elog/1025354
         sfp = 2 + (self.sector - 1) % 6
         if 1 <= self.sector <= 6:
-            fecs = "hefec1"
+            fecs = "hefec%d" % (1 + offset)
         elif 7 <= self.sector <= 12:
-            fecs = "hefec2"
+            fecs = "hefec%d" % (2 + offset)
         elif 13 <= self.sector <= 18:
-            fecs = "hefec3"
+            fecs = "hefec%d" % (3 + offset)
         else:
             fecs = "unknown"
 
