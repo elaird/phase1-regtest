@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import ngfec, printer
+import jtag, ngfec, printer
 from powerMon import commandOutputFull
 import datetime, optparse, os, sys, time
 
@@ -45,16 +45,16 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
-    parser.add_option("--fec",
-                      dest="fec",
-                      default=False,
-                      action="store_true",
-                      help="check status of FEC")
     parser.add_option("--guardians",
                       dest="guardians",
                       default=False,
                       action="store_true",
                       help="check status of ngCCMserver guardians")
+    parser.add_option("--fec",
+                      dest="fec",
+                      default=False,
+                      action="store_true",
+                      help="check status of FEC")
     parser.add_option("--ccm",
                       dest="ccm",
                       default=False,
@@ -65,6 +65,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="assume that J14 is connected to FEC")
+    parser.add_option("--device-info",
+                      dest="device_info",
+                      default=False,
+                      action="store_true",
+                      help="check JTAG device info")
     parser.add_option("--qiecards",
                       dest="qiecards",
                       default=False,
@@ -154,6 +159,9 @@ class commissioner:
         if options.guardians:
             self.guardians()
 
+        if options.device_info:
+            self.device_info()
+
         if options.fec:
             self.fec()
 
@@ -188,6 +196,29 @@ class commissioner:
 
     def guardians(self):
         print self.command("table\ntget %s-lg fns3G" % self.rbx)
+
+
+    def device_info(self):
+        opts2, _ = jtag.opts()
+        opts2.host = self.options.host
+        opts2.port = self.options.port
+        opts2.logfile = self.options.logfile
+
+        targets = ["%s-neigh" % self.rbx, "%s-pulser" % self.rbx]
+        for iRm in range(1, 6):
+            for iQieCard in range(1, 5):
+                if iRm == 5:
+                    if iQieCard == 1:
+                        stem = "calib"
+                    else:
+                        continue
+                else:
+                    stem = "%d-%d" % (iRm, iQieCard)
+
+                # targets.append("%s-%s-i" % (self.rbx, stem))
+
+        for target in targets:
+            p = jtag.programmer(opts2, target)
 
 
     def fec(self):
