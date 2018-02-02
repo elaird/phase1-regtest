@@ -215,9 +215,10 @@ class commissioner:
                 else:
                     stem = "%d-%d" % (iRm, iQieCard)
 
-                # targets.append("%s-%s-i" % (self.rbx, stem))
+                targets.append("%s-%s" % (self.rbx, stem))
 
         for target in targets:
+            print target
             p = jtag.programmer(opts2, target)
 
 
