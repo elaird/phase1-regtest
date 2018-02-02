@@ -429,37 +429,61 @@ class commissioner:
         out = []
         link_status = uhtr_tool_link_status(crate, slot1, he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
-            link, power, bad8b10b, bc0, _, write_delay, read_delay, fifo_occ, bprv, _, bad_full, invalid, _ = lines.split("\n")
+            link, power, bad8b10b, bc0, h1, write_delay, read_delay, fifo_occ, bprv, h2, bad_full, invalid, h3 = lines.split("\n")
             iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ)
             out.append((self.sector, crate, slot, ppod, items[iStart:iEnd]))
             if not check:
                 continue
 
             print "Crate %d Slot %2d" % (crate, slot)
-            print lines
-
-            # self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
-            self.uhtr_compare(slot, ppod, bad8b10b, 0)
+            print link
+            self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
+            self.uhtr_compare(slot, ppod, bad8b10b, 0, threshold=0)
             self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
+            printer.gray(h1)
+            self.uhtr_compare(slot, ppod, write_delay, 300, threshold=10000)
+            self.uhtr_compare(slot, ppod, read_delay, 300, threshold=10000)
             self.uhtr_compare(slot, ppod, fifo_occ, 12, threshold=9)
-            self.uhtr_compare(slot, ppod, bprv, 0x1111)
-            # self.uhtr_compare(slot, ppod, invalid, 0)
-            # self.uhtr_compare(slot, ppod, bad_full, 0, doubled=True)
+            self.uhtr_compare(slot, ppod, bprv, 0x1111, threshold=0)
+            printer.gray(h2)
+            self.uhtr_compare(slot, ppod, bad_full, 0, threshold=1, doubled=True)
+            self.uhtr_compare(slot, ppod, invalid, 0, threshold=1)
+            printer.gray(h3)
 
         return out
 
 
     def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
         iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst)
+        n = (len(lst) - 19) / 12
         if doubled:
             iStart *= 2
             iEnd *= 2
+            n /= 2
 
-        if threshold is None:
-            for i in range(iStart, iEnd):
-                self.compare("0x" + items[i], expected, strip=False, msg="%s (link %d)" % (lst[:19], 12*ppod + (i/2 if doubled else i)))
-        else:
-            self.compare_with_threshold(items[iStart:iEnd], expected, threshold, strip=False, msg=lst[:19].strip())
+        msg = lst[:19]
+        for i, x in enumerate(items):
+            try:
+                result = int(x, 16)
+            except ValueError:
+                try:
+                    result = float(x)
+                except ValueError:
+                    result = None
+
+            if doubled:
+                space = " " * (n - len(x) - 1)
+            else:
+                space = " " * (n - len(x) - 1)
+
+            if i < iStart or iEnd <= i or result is None:
+                msg += space + printer.gray(x, p=False) + " "
+            elif threshold is not None and threshold < abs(result - expected):
+                msg += space + printer.red(x, p=False) + " "
+            else:
+                msg += space + printer.green(x, p=False) + " "
+
+        print msg
 
 
     def uhtr_range_and_items(self, slot, ppod, lst):
