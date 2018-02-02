@@ -267,7 +267,8 @@ class programmer:
         if not self.options.deviceInfoOnly:
             self.enable()
         self.disconnect()
-        sys.exit()
+        if not self.options.deviceInfoOnly:
+            sys.exit()
 
 
     def check_exit_codes(self, lines):
