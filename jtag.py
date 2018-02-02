@@ -79,6 +79,11 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
+    parser.add_option("--device-info-only",
+                      dest="deviceInfoOnly",
+                      default=False,
+                      action="store_true",
+                      help="only do device info")
     parser.add_option("--skip-verify",
                       dest="skipVerify",
                       default=False,
@@ -107,19 +112,25 @@ class programmer:
 
         self.connect()
 
-        self.check_version()
-        self.disable()
-        self.reset_fec()
-        self.errors()
-        self.jtag()
-        self.check_version()
+        if self.options.deviceInfoOnly:
+            self.options.skipVerify = True
+            self.options.program = False
+            self.jtag()
+        else:
+            self.check_version()
+            self.disable()
+            self.reset_fec()
+            self.errors()
+            self.jtag()
+            self.check_version()
 
         self.bail()
 
 
     def connect(self):
         self.logfile = open(self.options.logfile, "a")
-        printer.gray("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (self.options.logfile, self.options.logfile))
+        if not self.options.deviceInfoOnly:
+            printer.gray("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (self.options.logfile, self.options.logfile))
         h = "-" * 30 + "\n"
         self.logfile.write(h)
         self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
@@ -253,7 +264,8 @@ class programmer:
     def bail(self, lines=None):
         if lines:
             printer.red("\n".join(lines))
-        self.enable()
+        if not self.options.deviceInfoOnly:
+            self.enable()
         self.disconnect()
         sys.exit()
 
