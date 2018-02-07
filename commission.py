@@ -590,7 +590,7 @@ class commissioner:
 
         for result in results:
             if threshold < abs(result - expected):
-                lines = ["Expected %s +- %5.1f: " % (str(expected), threshold), str(res)]
+                lines = ["Expected %s +- %s: " % (str(expected), str(threshold)), str(res)]
                 if msg:
                     lines.insert(0, msg)
                 self.bail(lines)
