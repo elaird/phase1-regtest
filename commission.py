@@ -237,6 +237,8 @@ class commissioner:
         else:
             fecs = "unknown"
 
+        print self.command("get ccmserver_version")
+
         self.check([("fec_ver_major_rr", 3, None),
                     ("fec_ver_minor_rr", 1, None),
                     ("fec_ver_build_rr", 2, None),
