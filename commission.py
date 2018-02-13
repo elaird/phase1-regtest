@@ -151,7 +151,19 @@ class commissioner:
         self.he = self.rbx.startswith("HE")
         self.sector = sector(target, "904" in options.host)
 
-        self.connect()
+        fe = False
+        for attr in dir(self.options):
+            if attr.startswith("_"):
+                continue
+            if attr in ["ensure_value", "read_file", "read_module"]:
+                continue
+            if attr in ["host", "port", "logfile", "nSeconds", "keepgoing", "j14", "uhtr"]:
+                continue
+            if getattr(self.options, attr):
+                fe = True
+
+        if fe:
+            self.connect()
 
         if self.options.enable:
             self.enable()
@@ -188,10 +200,9 @@ class commissioner:
 
         if options.uhtr:
             self.uhtr()
-        # if options.peltier:
-        #     self.peltier()
 
-        self.disconnect()
+        if fe:
+            self.disconnect()
 
 
     def guardians(self):
@@ -439,7 +450,26 @@ class commissioner:
                 continue
 
             print "Crate %d Slot %2d" % (crate, slot)
-            print link
+            link_headers = link[19:]
+            # https://github.com/elaird/hcalraw/blob/master/data/ref_2018.txt
+            s3 = slot % 3
+            if s3 == 1:
+                if ppod:
+                    link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20      rx21      rx22      rx23     "
+                else:
+                    link_headers = " rx00      rx01      rx02      rx03      rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
+            elif s3 == 2:
+                if ppod:
+                    link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
+                else:
+                    link_headers = " rx00      rx01      rx02(1-2) rx03(1-3) rx04(2-2) rx05(2-3) rx06(3-2) rx07(3-3) rx08(4-2) rx09(4-3) rx10(5-1) rx11     "
+            elif not s3:
+                if ppod:
+                    link_headers = " rx12      rx13(3-1) rx14(3-3) rx15(3-5) rx16(3-7) rx17(3-8) rx18(4-1) rx19(4-2) rx20(4-3) rx21(4-6) rx22(4-8) rx23(5-1)"
+                else:
+                    link_headers = " rx00      rx01(1-1) rx02(1-3) rx03(1-5) rx04(1-7) rx05(1-8) rx06(2-1) rx07(2-2) rx08(2-3) rx09(2-6) rx10(2-8) rx11(5-2)"
+
+            print link[:19] + link_headers
             self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0, threshold=0)
             self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
