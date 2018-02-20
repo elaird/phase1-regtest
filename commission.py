@@ -253,7 +253,7 @@ class commissioner:
         self.check([("fec_ver_major_rr", 3, None),
                     ("fec_ver_minor_rr", 1, None),
                     ("fec_ver_build_rr", 2, None),
-                    ("fec_firmware_date_rr", 0x29112017, None),
+                    ("fec_firmware_date_rr", 0x29012018, None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("sfp%d_status.TxFault_rr" % sfp, 0, None),
                     ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
@@ -306,6 +306,15 @@ class commissioner:
 
         self.check(lst)
         self.errors()
+
+
+    def bv_scan(self):
+        for iV in range(0, 75, 5):
+            target = "HEP05-4"
+            ch = 2
+            print self.command("put %s-biasvoltage%d_f %4.1f" % (target, ch, iV))
+            print self.command("get %s-biasmon%d_f_rr" % (target, ch))
+            time.sleep(2)
 
 
     def bv(self):
