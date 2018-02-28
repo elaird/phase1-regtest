@@ -42,7 +42,7 @@ def opts():
     parser.add_option("-H",
                       "--host",
                       dest="host",
-                      default="hcal904daq04",
+                      default="localhost",
                       help="ngccmserver host [default %default]")
     parser.add_option("-p",
                       "--port",
