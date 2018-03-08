@@ -234,9 +234,8 @@ class commissioner:
 
 
     def fec(self):
-        # HEP: http://cmsonline.cern.ch/cms-elog/1025354
-        # HEM: http://cmsonline.cern.ch/cms-elog/1027182
-        offset = 0 if self.rbx[2] == "P" else 3
+        # http://cmsonline.cern.ch/cms-elog/1030680
+        offset = 0 if self.rbx[2] == "M" else 3
 
         sfp = 2 + (self.sector - 1) % 6
         if 1 <= self.sector <= 6:
@@ -253,8 +252,7 @@ class commissioner:
         self.check([("fec_ver_major_rr", 3, None),
                     ("fec_ver_minor_rr", 1, None),
                     ("fec_ver_build_rr", 2, None),
-                    # ("fec_firmware_date_rr", 0x29012018, None),
-                    ("fec_firmware_date_rr", 0x01032018, None),
+                    ("fec_firmware_date_rr", 0x06032018, None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("sfp%d_status.TxFault_rr" % sfp, 0, None),
                     ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
