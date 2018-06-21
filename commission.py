@@ -25,17 +25,6 @@ def sector(rbx, b904=False):
 
 def opts():
     parser = optparse.OptionParser(usage="usage: %prog [options] RBX")
-    parser.add_option("-H",
-                      "--host",
-                      dest="host",
-                      default="localhost",
-                      help="ngccmserver host [default %default]")
-    parser.add_option("-p",
-                      "--port",
-                      dest="port",
-                      default=64000,
-                      type="int",
-                      help="ngccmserver port number [default %default]")
     parser.add_option("--log-file",
                       dest="logfile",
                       default="",
@@ -149,7 +138,20 @@ class commissioner:
         self.options = options
         self.rbx = target
         self.he = self.rbx.startswith("HE")
-        self.sector = sector(target, "904" in options.host)
+        if self.he:
+            self.end = target[2]
+            if self.end == "M":
+                self.host = "hcalngccm02"
+                self.port = 64000
+                self.sector = sector(target)
+            elif self.end == "P":
+                self.host = "hcalngccm03"
+                self.port = 64100
+                self.sector = sector(target)
+            else:  # assume 904
+                self.host = "hcal904daq04"
+                self.port = 64000
+                self.sector = sector(target, True)
 
         fe = False
         for attr in dir(self.options):
@@ -157,7 +159,7 @@ class commissioner:
                 continue
             if attr in ["ensure_value", "read_file", "read_module"]:
                 continue
-            if attr in ["host", "port", "logfile", "nSeconds", "keepgoing", "j14", "uhtr"]:
+            if attr in ["logfile", "nSeconds", "keepgoing", "j14", "uhtr"]:
                 continue
             if getattr(self.options, attr):
                 fe = True
@@ -211,8 +213,8 @@ class commissioner:
 
     def device_info(self):
         opts2, _ = jtag.opts()
-        opts2.host = self.options.host
-        opts2.port = self.options.port
+        opts2.host = self.host
+        opts2.port = self.port
         opts2.logfile = self.options.logfile
 
         targets = ["%s-neigh" % self.rbx, "%s-pulser" % self.rbx]
@@ -563,7 +565,7 @@ class commissioner:
 
         # ngfec.survey_clients()
         # ngfec.kill_clients()
-        self.server = ngfec.connect(self.options.host, self.options.port, self.logfile)
+        self.server = ngfec.connect(self.host, self.port, self.logfile)
 
 
     def disconnect(self):
