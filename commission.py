@@ -137,18 +137,28 @@ class commissioner:
     def __init__(self, options, target):
         self.options = options
         self.rbx = target
+        self.hb = self.rbx.startswith("HB")
         self.he = self.rbx.startswith("HE")
-        if self.he:
+        self.hf = self.rbx.startswith("HF")
+        if len(target) <= 2:
+            sys.exit("The RBX must contain at least three characters.")
+        else:
             self.end = target[2]
-            if self.end == "M":
+
+        self.host = "localhost"
+        self.port = 64000
+        self.sector = sector(target)
+
+        if self.end == "M":
+            if self.he:
                 self.host = "hcalngccm02"
                 self.port = 64000
-                self.sector = sector(target)
-            elif self.end == "P":
+        elif self.end == "P":
+            if self.he:
                 self.host = "hcalngccm03"
                 self.port = 64100
-                self.sector = sector(target)
-            else:  # assume 904
+        else:  # assume 904
+            if self.he:
                 self.host = "hcal904daq04"
                 self.port = 64000
                 self.sector = sector(target, True)
@@ -176,28 +186,30 @@ class commissioner:
         if options.device_info:
             self.device_info()
 
-        if options.fec:
+        phase1 = self.he or self.hf
+
+        if phase1 and options.fec:
             self.fec()
 
-        if options.ccm:
+        if phase1 and options.ccm:
             self.ccm()
 
-        if options.qiecards or options.qiecardsfull or options.bv:
+        if phase1 and (options.qiecards or options.qiecardsfull or options.bv):
             self.check([("bkp_pwr_bad_rr", 0, None)])
 
-        if options.qiecards:
+        if phase1 and options.qiecards:
             self.qiecards()
 
-        if options.qiecardsfull:
+        if phase1 and options.qiecardsfull:
             self.qiecards(full=True)
 
-        if options.qiecardshumid:
+        if phase1 and options.qiecardshumid:
             self.qiecards_humidity()
 
-        if options.get_delays or options.set_delays:
+        if phase1 and (options.get_delays or options.set_delays):
             self.set_delays(put=options.set_delays)
 
-        if options.bv:
+        if phase1 and options.bv:
             self.bv()
 
         if options.uhtr:
