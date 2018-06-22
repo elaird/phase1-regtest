@@ -5,7 +5,7 @@ import printer
 
 
 def connect(host, port, logfile=sys.stdout):
-    s = "ngFEC.exe -z -c -p %d -H %s" % (port, host)
+    s = "ngFEC.exe -z -c -t -p %d -H %s" % (port, host)
     p = pexpect.spawn(s)
     p.logfile = logfile
     p.sendline("")
