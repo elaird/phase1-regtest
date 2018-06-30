@@ -155,8 +155,12 @@ class commissioner:
                 self.port = 64000
         elif self.end == "P":
             if self.he:
-                self.host = "hcalngccm03"
-                self.port = 64100
+                if self.sector == 20:
+                    self.host = "hcalngccm02"
+                    self.port = 64100
+                else:
+                    self.host = "hcalngccm03"
+                    self.port = 64100
         else:  # assume 904
             if self.he:
                 self.host = "hcal904daq04"
@@ -258,6 +262,9 @@ class commissioner:
             fecs = "hefec%d" % (2 + offset)
         elif 13 <= self.sector <= 18:
             fecs = "hefec%d" % (3 + offset)
+        elif self.sector == 20:
+            fecs = "hefec7"
+            sfp = 2
         else:
             fecs = "unknown"
 
@@ -290,12 +297,16 @@ class commissioner:
         currentE = 0.15e-3
         if self.options.j14:
             lst = [("mezz_GEO_ADDR", 1, None),
+                   ("mezz_scratch", None, None),
+                   ("smezz_scratch", None, None),
                    ("mezz_FPGA_SILSIG", fw14, None),
                    ("smezz_FPGA_SILSIG", fw15, None),
                    ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
             ]
         else:
             lst = [("mezz_GEO_ADDR", 2, None),
+                   ("mezz_scratch", None, None),
+                   ("smezz_scratch", None, None),
                    ("mezz_FPGA_SILSIG", fw15, None),
                    ("smezz_FPGA_SILSIG", fw14, None),
                    ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
