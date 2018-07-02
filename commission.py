@@ -152,10 +152,13 @@ class commissioner:
         if self.end == "M":
             if self.he:
                 self.host = "hcalngccm02"
-                self.port = 64000
+                if self.sector >= 20:
+                    self.port = 64100
+                else:
+                    self.port = 64000
         elif self.end == "P":
             if self.he:
-                if self.sector == 20:
+                if self.sector >= 20:
                     self.host = "hcalngccm02"
                     self.port = 64100
                 else:
@@ -265,6 +268,12 @@ class commissioner:
         elif self.sector == 20:
             fecs = "hefec7"
             sfp = 2
+        elif self.sector == 35:
+            fecs = "hefec7"
+            sfp = 3
+        elif self.sector == 36:
+            fecs = "hefec7"
+            sfp = 4
         else:
             fecs = "unknown"
 
@@ -277,6 +286,7 @@ class commissioner:
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("sfp%d_status.TxFault_rr" % sfp, 0, None),
                     ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
+                    ("sfp%d_gbt_rx_ready_rr" % sfp, 1, None),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
                     # qie_reset_cnt_rr
