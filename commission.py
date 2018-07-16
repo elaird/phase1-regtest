@@ -147,9 +147,9 @@ class commissioner:
 
         self.host = "localhost"
         self.port = 64000
-        self.sector = sector(target)
 
         if self.end == "M":
+            self.sector = sector(target)
             if self.he:
                 self.host = "hcalngccm02"
                 if self.sector >= 20:
@@ -157,6 +157,7 @@ class commissioner:
                 else:
                     self.port = 64000
         elif self.end == "P":
+            self.sector = sector(target)
             if self.he:
                 if self.sector >= 20:
                     self.host = "hcalngccm02"
@@ -165,10 +166,10 @@ class commissioner:
                     self.host = "hcalngccm03"
                     self.port = 64100
         else:  # assume 904
+            self.sector = sector(target, True)
             if self.he:
                 self.host = "hcal904daq04"
                 self.port = 64000
-                self.sector = sector(target, True)
 
         fe = False
         for attr in dir(self.options):
@@ -258,6 +259,7 @@ class commissioner:
         # http://cmsonline.cern.ch/cms-elog/1030680
         offset = 0 if self.rbx[2] == "M" else 3
 
+        fecs = "unknown"
         sfp = 2 + (self.sector - 1) % 6
         if 1 <= self.sector <= 6:
             fecs = "hefec%d" % (1 + offset)
@@ -274,8 +276,9 @@ class commissioner:
         elif self.sector == 36:
             fecs = "hefec7"
             sfp = 4
-        else:
-            fecs = "unknown"
+        elif self.sector == 0 and self.he and "904" in self.host:
+            fecs = "hefec1"
+            sfp = 2
 
         print self.command("get ccmserver_version")
 
