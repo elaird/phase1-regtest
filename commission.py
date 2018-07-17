@@ -534,30 +534,36 @@ class commissioner:
             print "Crate %d Slot %2d" % (crate, slot)
             link_headers = link[19:]
             # https://github.com/elaird/hcalraw/blob/master/data/ref_2018.txt
-            s3 = slot % 3
-            if s3 == 1:
+            if self.hb or self.he:
+                s3 = slot % 3
+                if s3 == 1:
+                    if ppod:
+                        link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20      rx21      rx22      rx23     "
+                    else:
+                        link_headers = " rx00      rx01      rx02      rx03      rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
+                elif s3 == 2:
+                    if ppod:
+                        link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
+                    else:
+                        link_headers = " rx00      rx01      rx02(1-2) rx03(1-3) rx04(2-2) rx05(2-3) rx06(3-2) rx07(3-3) rx08(4-2) rx09(4-3) rx10(5-1) rx11     "
+                elif not s3:
+                    if ppod:
+                        link_headers = " rx12      rx13(3-1) rx14(3-3) rx15(3-5) rx16(3-7) rx17(3-8) rx18(4-1) rx19(4-2) rx20(4-3) rx21(4-6) rx22(4-8) rx23(5-1)"
+                    else:
+                        link_headers = " rx00      rx01(1-1) rx02(1-3) rx03(1-5) rx04(1-7) rx05(1-8) rx06(2-1) rx07(2-2) rx08(2-3) rx09(2-6) rx10(2-8) rx11(5-2)"
+            elif self.hf:
                 if ppod:
-                    link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20      rx21      rx22      rx23     "
+                    link_headers = " rx12      rx13      rx14      rx15      rx16      rx17      rx18      rx19      rx20      rx21      rx22      rx23     "
                 else:
-                    link_headers = " rx00      rx01      rx02      rx03      rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
-            elif s3 == 2:
-                if ppod:
-                    link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
-                else:
-                    link_headers = " rx00      rx01      rx02(1-2) rx03(1-3) rx04(2-2) rx05(2-3) rx06(3-2) rx07(3-3) rx08(4-2) rx09(4-3) rx10(5-1) rx11     "
-            elif not s3:
-                if ppod:
-                    link_headers = " rx12      rx13(3-1) rx14(3-3) rx15(3-5) rx16(3-7) rx17(3-8) rx18(4-1) rx19(4-2) rx20(4-3) rx21(4-6) rx22(4-8) rx23(5-1)"
-                else:
-                    link_headers = " rx00      rx01(1-1) rx02(1-3) rx03(1-5) rx04(1-7) rx05(1-8) rx06(2-1) rx07(2-2) rx08(2-3) rx09(2-6) rx10(2-8) rx11(5-2)"
+                    link_headers = " rx00      rx01      rx02      rx03      rx04      rx05      rx06      rx07      rx08      rx09      rx10      rx11     "
 
             print link[:19] + link_headers
             self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0, threshold=0)
-            self.uhtr_compare(slot, ppod, bc0, 1.12e1, threshold=0.1e1)
+            self.uhtr_compare(slot, ppod, bc0, 0.1 if self.hb else 11.2, threshold=(0.01 if self.hb else 1.0))
             printer.gray(h1)
-            self.uhtr_compare(slot, ppod, write_delay, 300, threshold=10000)
-            self.uhtr_compare(slot, ppod, read_delay, 300, threshold=10000)
+            self.uhtr_compare(slot, ppod, write_delay, 300, threshold=100000, dec=True)
+            self.uhtr_compare(slot, ppod, read_delay, 300, threshold=100000, dec=True)
             self.uhtr_compare(slot, ppod, fifo_occ, 12, threshold=9)
             self.uhtr_compare(slot, ppod, bprv, 0x1111, threshold=0)
             printer.gray(h2)
@@ -568,7 +574,7 @@ class commissioner:
         return out
 
 
-    def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False):
+    def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False, dec=False):
         iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst)
         n = (len(lst) - 19) / 12
         if doubled:
@@ -579,7 +585,7 @@ class commissioner:
         msg = lst[:19]
         for i, x in enumerate(items):
             try:
-                result = int(x, 16)
+                result = int(x, 10 if dec else 16)
             except ValueError:
                 try:
                     result = float(x)
@@ -603,6 +609,15 @@ class commissioner:
 
     def uhtr_range_and_items(self, slot, ppod, lst):
         items = lst[19:].split()
+
+        if self.rbx == "lasermon":
+            if slot == 9 and not ppod:
+                return 0, 1, items
+            else:
+                return 0, 0, items
+
+        if self.hf:
+            return 0, 12, items
 
         if (slot % 3) == 0:
             iStart = 1
