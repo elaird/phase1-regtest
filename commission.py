@@ -6,11 +6,14 @@ import datetime, optparse, os, sys, time
 
 
 def sector(rbx, b904=False):
-    if (not rbx.startswith("HB")) and (not rbx.startswith("HE")):
-        sys.exit("This script only works with HB or HE RBXes.")
+    if rbx == "lasermon":
+        return None  # special case
+
+    if rbx[:2] not in ["HB", "HE", "HF"]:
+        sys.exit("This script only works with HB, HE, HF, or lasermon RBXes.")
 
     if (not b904) and (rbx[2] not in "MP"):
-        sys.exit("This script only works with HEP or HEM RBXes.")
+        sys.exit("This script only works with P or M RBXes (unless at 904).")
 
     try:
         if b904:
@@ -119,13 +122,13 @@ def opts():
     return options, args[0]
 
 
-def uhtr_tool_link_status(crate, slot1, he):
+def uhtr_tool_link_status(crate, slot1, slot2, he):
     lines = {}
-    for slot in [slot1, slot1 + 1]:
+    for slot in [slot1, slot2]:
         for ppod in range(2):
             if he and slot == slot1 and not ppod:
                 continue
-            if (not he) and slot == slot1 + 1 and ppod:
+            if (not he) and slot == slot2 and ppod:
                 continue
 
             cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep '^PPOD%d' -A 11" % (crate, slot, ppod)
@@ -139,37 +142,43 @@ class commissioner:
         self.rbx = target
         self.hb = self.rbx.startswith("HB")
         self.he = self.rbx.startswith("HE")
-        self.hf = self.rbx.startswith("HF")
-        if len(target) <= 2:
+        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon"
+        if len(self.rbx) <= 2:
             sys.exit("The RBX must contain at least three characters.")
         else:
-            self.end = target[2]
+            self.end = self.rbx[2]
 
         self.host = "localhost"
         self.port = 64000
 
-        if self.end == "M":
-            self.sector = sector(target)
-            if self.he:
+        if self.hb:
+            if self.end in "MP":
+                self.sector = sector(self.rbx)
+        elif self.he:
+            if self.end == "M":
+                self.sector = sector(self.rbx)
                 self.host = "hcalngccm02"
                 if self.sector >= 20:
                     self.port = 64100
                 else:
                     self.port = 64000
-        elif self.end == "P":
-            self.sector = sector(target)
-            if self.he:
+            elif self.end == "P":
+                self.sector = sector(self.rbx)
                 if self.sector >= 20:
                     self.host = "hcalngccm02"
                     self.port = 64100
                 else:
                     self.host = "hcalngccm03"
                     self.port = 64100
-        else:  # assume 904
-            self.sector = sector(target, True)
-            if self.he:
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
                 self.host = "hcal904daq04"
                 self.port = 64000
+        elif self.hf:
+            self.sector = sector(self.rbx)
+            self.host = "hcalngccm01"
+            self.port = 63000
+
 
         fe = False
         for attr in dir(self.options):
@@ -199,6 +208,7 @@ class commissioner:
         if phase1 and options.fec:
             self.fec()
 
+        phase1 = self.he  # hack: HF not yet implemented
         if phase1 and options.ccm:
             self.ccm()
 
@@ -257,35 +267,56 @@ class commissioner:
 
     def fec(self):
         # http://cmsonline.cern.ch/cms-elog/1030680
-        offset = 0 if self.rbx[2] == "M" else 3
 
         fecs = "unknown"
-        sfp = 2 + (self.sector - 1) % 6
-        if 1 <= self.sector <= 6:
-            fecs = "hefec%d" % (1 + offset)
-        elif 7 <= self.sector <= 12:
-            fecs = "hefec%d" % (2 + offset)
-        elif 13 <= self.sector <= 18:
-            fecs = "hefec%d" % (3 + offset)
-        elif self.sector == 20:
-            fecs = "hefec7"
-            sfp = 2
-        elif self.sector == 35:
-            fecs = "hefec7"
-            sfp = 3
-        elif self.sector == 36:
-            fecs = "hefec7"
-            sfp = 4
-        elif self.sector == 0 and self.he and "904" in self.host:
-            fecs = "hefec1"
-            sfp = 2
+        sfp = 99
+
+        if self.he:
+            fw = (3, 1, 2, 0x14032018)
+            offset = 0 if self.end == "M" else 3
+            sfp = 2 + (self.sector - 1) % 6
+            if 1 <= self.sector <= 6:
+                fecs = "hefec%d" % (1 + offset)
+            elif 7 <= self.sector <= 12:
+                fecs = "hefec%d" % (2 + offset)
+            elif 13 <= self.sector <= 18:
+                fecs = "hefec%d" % (3 + offset)
+            elif self.sector == 20:
+                fecs = "hefec7"
+                sfp = 2
+            elif self.sector == 35:
+                fecs = "hefec7"
+                sfp = 3
+            elif self.sector == 36:
+                fecs = "hefec7"
+                sfp = 4
+            elif self.sector == 0 and self.he and "904" in self.host:
+                fecs = "hefec1"
+                sfp = 2
+        elif self.hf:
+            fw = (3, 1, 2, 0x16042018)
+            if self.end == "M" and 1 <= self.sector <= 6:
+                fecs = "hffec1"
+                sfp = 1 + self.sector
+            if self.end == "M" and 7 <= self.sector <= 8:
+                fecs = "hffec2"
+                sfp = self.sector - 5
+            if self.end == "P" and 1 <= self.sector <= 4:
+                fecs = "hffec2"
+                sfp = 3 + self.sector
+            if self.end == "P" and 5 <= self.sector <= 8:
+                fecs = "hffec3"
+                sfp = self.sector - 4
+            if self.rbx == "lasermon":
+                fecs = "hffec3"
+                sfp = 6
 
         print self.command("get ccmserver_version")
 
-        self.check([("fec_ver_major_rr", 3, None),
-                    ("fec_ver_minor_rr", 1, None),
-                    ("fec_ver_build_rr", 2, None),
-                    ("fec_firmware_date_rr", 0x14032018, None),
+        self.check([("fec_ver_major_rr", fw[0], None),
+                    ("fec_ver_minor_rr", fw[1], None),
+                    ("fec_ver_build_rr", fw[2], None),
+                    ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("sfp%d_status.TxFault_rr" % sfp, 0, None),
                     ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
@@ -464,30 +495,35 @@ class commissioner:
 
 
     def uhtr(self, check=True):
-        if self.rbx[2] in "MP":  # USC
-            end = "MP".index(self.rbx[2])
-            if self.sector == 18:
-                index = 0
-            else:
-                index = self.sector / 2
+        iEnd = "MP".find(self.end)
 
-            try:
-                # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
-                crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
-                crate = crates[index]
-                slot1 = 6 * end + 3 * (self.sector % 2) + 1 + int(self.he)
-            except IndexError:
-                printer.error("Could not find uHTR reading out %s" % self.rbx)
-                return
-        else:  # 904
+        if self.rbx == "lasermon":
+            crate = 38
+            slot1 = 7
+            slot2 = 9
+        elif iEnd != -1:  # USC
+            if self.hf:
+                sys.exit("'--uhtr' is not yet supported for HF.")
+            else:  # HBHE
+              try:
+                  # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
+                  crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
+                  crate = crates[self.sector / 2]
+                  slot1 = 6 * iEnd + 3 * (self.sector % 2) + 1 + int(self.he)
+                  slot2 = slot1 + 1
+              except IndexError:
+                  printer.error("Could not find uHTR reading out %s" % self.rbx)
+                  return
+        elif self.he:  # 904
             ss = self.sector - 1
             crate = 61 + ss / 9
             if 9 <= ss:
                 ss -= 9
             slot1 = 1 + 4 * ss / 3
+            slot2 = slot1 + 1
 
         out = []
-        link_status = uhtr_tool_link_status(crate, slot1, he=self.he)
+        link_status = uhtr_tool_link_status(crate, slot1, slot2, he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
             link, power, bad8b10b, bc0, h1, write_delay, read_delay, fifo_occ, bprv, h2, bad_full, invalid, h3 = lines.split("\n")
             iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ)
