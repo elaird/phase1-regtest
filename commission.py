@@ -6,8 +6,8 @@ import datetime, optparse, os, sys, time
 
 
 def sector(rbx, b904=False):
-    if rbx == "lasermon":
-        return None  # special case
+    if rbx in ["lasermon", "ZDCM", "ZDCP"]:  # special cases
+        return None
 
     if rbx[:2] not in ["HB", "HE", "HF"]:
         sys.exit("This script only works with HB, HE, HF, or lasermon RBXes.")
@@ -142,7 +142,7 @@ class commissioner:
         self.rbx = target
         self.hb = self.rbx.startswith("HB")
         self.he = self.rbx.startswith("HE")
-        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon"
+        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
         if len(self.rbx) <= 2:
             sys.exit("The RBX must contain at least three characters.")
         else:
@@ -203,31 +203,31 @@ class commissioner:
         if options.device_info:
             self.device_info()
 
-        phase1 = self.he or self.hf
-
-        if phase1 and options.fec:
+        if (self.he or self.hf) and options.fec:
             self.fec()
 
-        phase1 = self.he  # hack: HF not yet implemented
-        if phase1 and options.ccm:
+        if (self.he or self.hf) and options.ccm:
             self.ccm()
 
-        if phase1 and (options.qiecards or options.qiecardsfull or options.bv):
+        if self.he and (options.qiecards or options.qiecardsfull or options.bv):
             self.check([("bkp_pwr_bad_rr", 0, None)])
 
-        if phase1 and options.qiecards:
-            self.qiecards()
+        if options.qiecards:
+            if self.he:
+                self.qiecards_he()
+            if self.hf:
+                self.qiecards_hf()
 
-        if phase1 and options.qiecardsfull:
+        if self.he and options.qiecardsfull:
             self.qiecards(full=True)
 
-        if phase1 and options.qiecardshumid:
+        if self.he and options.qiecardshumid:
             self.qiecards_humidity()
 
-        if phase1 and (options.get_delays or options.set_delays):
+        if self.he and (options.get_delays or options.set_delays):
             self.set_delays(put=options.set_delays)
 
-        if phase1 and options.bv:
+        if self.he and options.bv:
             self.bv()
 
         if options.uhtr:
@@ -307,7 +307,10 @@ class commissioner:
             if self.end == "P" and 5 <= self.sector <= 8:
                 fecs = "hffec3"
                 sfp = self.sector - 4
-            if self.rbx == "lasermon":
+            if self.rbx == "lasermon" or self.rbx == "ZDCM":
+                fecs = "hffec3"
+                sfp = 5
+            if self.rbx == "ZDCP":
                 fecs = "hffec3"
                 sfp = 6
 
@@ -339,38 +342,44 @@ class commissioner:
         fw15 = 0x17092803
         current = 0.35e-3
         currentE = 0.15e-3
-        if self.options.j14:
-            lst = [("mezz_GEO_ADDR", 1, None),
-                   ("mezz_scratch", None, None),
-                   ("smezz_scratch", None, None),
-                   ("mezz_FPGA_SILSIG", fw14, None),
-                   ("smezz_FPGA_SILSIG", fw15, None),
-                   ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
-            ]
-        else:
-            lst = [("mezz_GEO_ADDR", 2, None),
-                   ("mezz_scratch", None, None),
-                   ("smezz_scratch", None, None),
-                   ("mezz_FPGA_SILSIG", fw15, None),
-                   ("smezz_FPGA_SILSIG", fw14, None),
-                   ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
-            ]
 
-        temp = 35.0
-        tempE = 5.0
-        lst += [# ("temp_J13_Clk_U10_f_rr", temp, tempE),
-                # ("temp_J13_Clk_U11_f_rr", temp, tempE),
-                # ("temp_J14_Ctrl_U18_f_rr", temp, tempE),
-                # ("temp_J14_Ctrl_U19_f_rr", temp, tempE),
-                # ("temp_J15_Ctrl_U18_f_rr", temp, tempE),
-                # ("temp_J15_Ctrl_U19_f_rr", temp, tempE),
-                # ("temp_J16_Clk_U10_f_rr", temp, tempE),
-                # ("temp_J16_Clk_U11_f_rr", temp, tempE),
-                # ("J13_Clk_1w_f", None, None),
-                # ("J14_Cntrl_1w_f", None, None),
-                # ("J15_Cntrl_1w_f", None, None),
-                # ("J16_Clk_1w_f", None, None),
-            ]
+        if self.he:
+            if self.options.j14:
+                lst = [("mezz_GEO_ADDR", 1, None),
+                       ("mezz_scratch", None, None),
+                       ("smezz_scratch", None, None),
+                       ("mezz_FPGA_SILSIG", fw14, None),
+                       ("smezz_FPGA_SILSIG", fw15, None),
+                       ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
+                ]
+            else:
+                lst = [("mezz_GEO_ADDR", 2, None),
+                       ("mezz_scratch", None, None),
+                       ("smezz_scratch", None, None),
+                       ("mezz_FPGA_SILSIG", fw15, None),
+                       ("smezz_FPGA_SILSIG", fw14, None),
+                       ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
+                ]
+
+            temp = 35.0
+            tempE = 5.0
+            lst += [# ("temp_J13_Clk_U10_f_rr", temp, tempE),
+                    # ("temp_J13_Clk_U11_f_rr", temp, tempE),
+                    # ("temp_J14_Ctrl_U18_f_rr", temp, tempE),
+                    # ("temp_J14_Ctrl_U19_f_rr", temp, tempE),
+                    # ("temp_J15_Ctrl_U18_f_rr", temp, tempE),
+                    # ("temp_J15_Ctrl_U19_f_rr", temp, tempE),
+                    # ("temp_J16_Clk_U10_f_rr", temp, tempE),
+                    # ("temp_J16_Clk_U11_f_rr", temp, tempE),
+                    # ("J13_Clk_1w_f", None, None),
+                    # ("J14_Cntrl_1w_f", None, None),
+                    # ("J15_Cntrl_1w_f", None, None),
+                    # ("J16_Clk_1w_f", None, None),
+                ]
+        if self.hf:
+            lst = [("mezz_FPGA_SILSIG", 0x16120501, None),
+                   ("vtrx_rssi_f_rr", current, currentE),
+                   ]
 
         self.check(lst)
         self.errors()
@@ -407,7 +416,29 @@ class commissioner:
                     self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
 
 
-    def qiecards(self, full=False):
+    def qiecards_hf(self, **_):
+        items = []
+
+        if self.rbx == "lasermon" or self.rbx == "ZDCM":
+            sites = [2, 3, 4]
+        elif self.rbx == "ZDCP":
+            sites = [3, 4]
+        else:
+            sites = [3, 4, 5, 6, 10, 11, 12, 13, 14]
+
+        for iQieCard in sites:
+            items.append(("%d-B_FIRMVERSION_MAJOR" % iQieCard, 2, None))
+            items.append(("%d-B_FIRMVERSION_MINOR" % iQieCard, 2, None))
+            for igloo in ["iBot", "iTop"]:
+                stem = "%d-%s" % (iQieCard, igloo)
+                items.append(("%s_FPGA_MAJOR_VERSION_rr" % stem, 7, None))
+                items.append(("%s_FPGA_MINOR_VERSION_rr" % stem, 1, None))
+
+        # items.append(("pulser-fpga", 6, None))
+        self.check(items)
+
+
+    def qiecards_he(self, full=False):
         items = []
         for iRm in range(1, 6):
             for iQieCard in range(1, 5):
@@ -751,7 +782,7 @@ class commissioner:
             self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
         if ccm1 != ccm2:
             self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
-        if b2b1 != b2b2:
+        if (b2b1 != b2b2) and self.he:
             self.bail(["Link errors detected via CCM counters:", b2b1[0], b2b2[0]])
 
 
