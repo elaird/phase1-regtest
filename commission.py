@@ -306,13 +306,13 @@ class commissioner:
                 sfp = 3 + self.sector
             if self.end == "P" and 5 <= self.sector <= 8:
                 fecs = "hffec3"
-                sfp = self.sector - 4
+                sfp = self.sector - 3
             if self.rbx == "lasermon" or self.rbx == "ZDCM":
                 fecs = "hffec3"
-                sfp = 5
+                sfp = 6
             if self.rbx == "ZDCP":
                 fecs = "hffec3"
-                sfp = 6
+                sfp = 7
 
         print self.command("get ccmserver_version")
 
