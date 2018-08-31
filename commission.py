@@ -281,15 +281,18 @@ class commissioner:
                 fecs = "hefec%d" % (2 + offset)
             elif 13 <= self.sector <= 18:
                 fecs = "hefec%d" % (3 + offset)
-            elif self.sector == 20:
+            elif self.rbx == "HEP30":
                 fecs = "hefec7"
                 sfp = 2
-            elif self.sector == 35:
+            elif self.rbx == "HEM35":
                 fecs = "hefec7"
                 sfp = 3
-            elif self.sector == 36:
+            elif self.rbx == "HEM36":
                 fecs = "hefec7"
                 sfp = 4
+            elif self.rbx == "HEM29":
+                fecs = "hefec7"
+                sfp = 5
             elif self.sector == 0 and self.he and "904" in self.host:
                 fecs = "hefec1"
                 sfp = 2
@@ -778,12 +781,12 @@ class commissioner:
         ccm2 = self.command(ccm)
         b2b2 = self.command(b2b)
 
-        if fec1 != fec2:
-            self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
-        if ccm1 != ccm2:
-            self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
-        if (b2b1 != b2b2) and self.he:
-            self.bail(["Link errors detected via CCM counters:", b2b1[0], b2b2[0]])
+        if fec1 != fec2 or "ERROR" in fec1:
+            self.bail(["Link errors detected via FEC counters:", fec1, fec2])
+        if ccm1 != ccm2 or "ERROR" in ccm1:
+            self.bail(["Link errors detected via CCM counters:", ccm1, ccm2])
+        if self.he and (b2b1 != b2b2 or "ERROR" in b2b1):
+            self.bail(["Link errors detected via CCM counters:", b2b1, b2b2])
 
 
     def bail(self, lines=None):
