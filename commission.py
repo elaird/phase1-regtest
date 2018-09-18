@@ -769,7 +769,7 @@ class commissioner:
     def errors(self):
         print("Reading control link error counters (integrating for %d seconds)" % self.options.nSeconds)
         fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.rbx
-        ccm = "get %s-[,s]mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
+        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
         b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
 
         fec1 = self.command(fec)
