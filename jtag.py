@@ -4,37 +4,71 @@ import ngfec, printer
 import datetime, optparse, os, sys, time
 
 
+def hb(rbx):
+    return rbx[1] == "B"
+
+
+def check_rm(coords):
+    try:
+        rm = int(coords[1])
+    except ValueError:
+        sys.exit("RM must be 1, 2, 3, or 4.")
+
+    if rm < 1 or 4 < rm:
+        sys.exit("RM must be 1, 2, 3, or 4.")
+    try:
+        q = int(coords[2])
+    except ValueError:
+        sys.exit("QIEcard must be 1, 2, 3, or 4.")
+    if q < 1 or 4 < q:
+        sys.exit("QIEcard must be 1, 2, 3, or 4.")
+
+
+def check_tb(coords, fail):
+    if coords[-1] not in ["top", "bot", "iTop", "iBot"]:
+        sys.exit(fail)
+
+
 def check_target(target):
     coords = target.split("-")
-    fail = "Expected RBX-RM-QIEcard or RBX-calib or RBX-pulser or RBX-neigh.  Found %s" % str(target)
+    fail = "Expected RBX[a/b]-RM-QIEcard[-top/bot] or RBX-calib[-top/bot] or RBX-pulser or RBX[a/b]-neigh.  Found %s" % str(target)
 
     if not coords:
         sys.exit(fail)
 
     rbx = coords[0]
-    if not rbx.startswith("HE"):
-        sys.exit("This script only works with HE RBXes.")
+    if not (rbx.startswith("HB") or rbx.startswith("HE")):
+        sys.exit("This script only works with HB or HE RBXes.")
 
     if len(coords) == 2:
-        if coords[1] not in ["neigh", "calib", "pulser"]:
+        if coords[1] not in (["neigh", "pulser"] + ([] if hb(rbx) else ["calib"])):
             sys.exit(fail)
-    elif len(coords) == 3:
-        try:
-            rm = int(coords[1])
-        except ValueError:
-            sys.exit("RM must be 1, 2, 3, or 4.")
-        if rm < 1 or 4 < rm:
-            sys.exit("RM must be 1, 2, 3, or 4.")
-        try:
-            q = int(coords[2])
-        except ValueError:
-            sys.exit("QIEcard must be 1, 2, 3, or 4.")
-        if q < 1 or 4 < q:
-            sys.exit("QIEcard must be 1, 2, 3, or 4.")
+        if coords[1] == "neigh" and hb(rbx) and rbx[-1] not in "ab":
+            sys.exit(fail)
+
+    elif len(coords) == 3 and hb(rbx):
+        if coords[1] != "calib":
+            sys.exit(fail)
+        check_tb(coords, fail)
+    elif len(coords) == 3 and not hb(rbx):
+        check_rm(coords)
+    elif len(coords) == 4:
+        if not hb(rbx):
+            sys.exit(fail)
+        check_rm(coords)
+        check_tb(coords, fail)
     else:
         sys.exit(fail)
 
-    return rbx
+    if hb(rbx):
+        if rbx[-1] in "ab":
+            rbx = rbx[:-1]
+        else:
+            letter = "a" if coords[1] in ["pulser", "calib", "1", "2"] else "b"
+            target = "-".join([coords[0] + letter] + coords[1:])
+
+    target = target.replace("iTop", "top").replace("iBot", "bot")
+    return target, rbx
 
 
 def opts():
@@ -47,17 +81,23 @@ def opts():
     parser.add_option("-p",
                       "--port",
                       dest="port",
-                      default=64000,
+                      # default=64000,
+                      default=64200,
                       type="int",
                       help="ngccmserver port number [default %default]")
     parser.add_option("--log-file",
                       dest="logfile",
                       default="jtag.log",
                       help="log file to which to append [default %default]")
-    parser.add_option("--stp-igloo",
-                      dest="stpIgloo",
+    parser.add_option("--stp-igloo-HE",
+                      dest="stpIglooHe",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
+                      help="[default %default]")
+    parser.add_option("--stp-igloo-HB",
+                      dest="stpIglooHb",
+                      metavar="a.stp",
+                      default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03.stp",
                       help="[default %default]")
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
@@ -67,12 +107,14 @@ def opts():
     parser.add_option("--stp-J15",
                       dest="stpJ15",
                       metavar="a.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
                       metavar="a.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -107,8 +149,8 @@ def opts():
 class programmer:
     def __init__(self, options, target):
         self.options = options
-        self.target = target
-        self.rbx = check_target(target)
+        self.target, self.rbx = check_target(target)
+        self.target0 = self.target.split("-")[0]
 
         self.connect()
 
@@ -154,9 +196,13 @@ class programmer:
         if self.target.endswith("neigh"):
             cmd = "get %s_FPGA_SILSIG" % self.target.replace("neigh", "smezz")
         elif self.target.endswith("pulser"):
-            cmd = "get %s-fpga" % self.target
+            cmd = "get %s-fpga" % self.target.replace(self.target0, self.rbx)
         else:
-            cmd = "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % self.target
+            if hb(self.rbx):
+                s = self.target.replace(self.target0, self.rbx).replace("top", "iTop").replace("bot", "iBot")
+                cmd = "get %s_FPGA_[MAJOR,MINOR]_VERSION_rr" % s
+            else:
+                cmd = "get %s-i_FPGA_[MAJOR,MINOR]_VERSION_rr" % self.target
 
         print("Reading firmware version: %s" % self.command(cmd))
 
@@ -177,9 +223,9 @@ class programmer:
         # ngfec.command(server, "put hefec3-cdce_sync 0")
         # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
         # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
-        self.command("put %s-fec_jtag_part_reset 0" % self.rbx)
-        self.command("put %s-fec_jtag_part_reset 1" % self.rbx)
-        self.command("put %s-fec_jtag_part_reset 0" % self.rbx)
+        self.command("put %s-fec_jtag_part_reset 0" % self.target0)
+        self.command("put %s-fec_jtag_part_reset 1" % self.target0)
+        self.command("put %s-fec_jtag_part_reset 0" % self.target0)
 
 
     def enable(self):
@@ -191,8 +237,8 @@ class programmer:
 
     def errors(self):
         print("Reading link error counters (integrating for %d seconds)" % self.options.nSeconds)
-        fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.rbx
-        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
+        fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.target0
+        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
         fec1 = self.command(fec)
         ccm1 = self.command(ccm)
 
@@ -230,7 +276,7 @@ class programmer:
         elif self.target.endswith("pulser"):
             stp = self.options.stpPulser
         else:
-            stp = self.options.stpIgloo
+            stp = self.options.stpIglooHb if hb(self.rbx) else self.options.stpIglooHe
 
         self.check_stp(stp)
 
