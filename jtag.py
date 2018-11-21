@@ -121,6 +121,11 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
+    parser.add_option("--ground0",
+                      dest="ground0",
+                      default=False,
+                      action="store_true",
+                      help="first, do ground0")
     parser.add_option("--device-info-only",
                       dest="deviceInfoOnly",
                       default=False,
@@ -160,6 +165,7 @@ class programmer:
             self.jtag()
         else:
             self.check_version()
+            self.ground0()
             self.disable()
             self.reset_fec()
             self.errors()
@@ -189,7 +195,10 @@ class programmer:
 
 
     def command(self, cmd):
-        return ngfec.command(self.server, cmd)[0]
+        out = ngfec.command(self.server, cmd)[0]
+        if "ERROR" in out:
+            print(out)
+        return out
 
 
     def check_version(self):
@@ -207,37 +216,53 @@ class programmer:
         print("Reading firmware version: %s" % self.command(cmd))
 
 
+    def ground0(self):
+        if self.options.ground0:
+            print("Ground stating")
+            self.command("tput %s-lg ground0" % self.rbx)
+            self.command("tput %s-lg waitG" % self.rbx)
+            self.command("tput %s-lg push" % self.rbx)
+
+
     def disable(self):
         print("Disabling Peltier control and guardian actions")
         # https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming
-        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg disable" % (self.rbx, self.rbx, self.rbx, self.rbx))
+        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g disable" % (self.rbx, self.rbx, self.rbx))
+        self.command("tput %s-cg disable" % self.target0)
         self.command("put %s-[1-4]-peltier_control 4*0" % self.rbx)
         time.sleep(2)
         self.command("tput %s-[1-4]-[1-4]-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
         self.command("tput %s-calib-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
+        if hb(self.rbx):
+            self.command("tput %s-bkp_jtag_sel %s-sel_sec_jtag enable" % (self.target0, self.target0))
 
 
     def reset_fec(self):
-        print("Resetting JTAG part of FEC")
-        # ngfec.command(server, "put hefec3-cdce_sync 1")
-        # ngfec.command(server, "put hefec3-cdce_sync 0")
-        # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
-        # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
-        self.command("put %s-fec_jtag_part_reset 0" % self.target0)
-        self.command("put %s-fec_jtag_part_reset 1" % self.target0)
-        self.command("put %s-fec_jtag_part_reset 0" % self.target0)
+        if not hb(self.rbx):
+            print("Resetting JTAG part of FEC")
+            # ngfec.command(server, "put hefec3-cdce_sync 1")
+            # ngfec.command(server, "put hefec3-cdce_sync 0")
+            # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
+            # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
+            self.command("put %s-fec_jtag_part_reset 0" % self.target0)
+            self.command("put %s-fec_jtag_part_reset 1" % self.target0)
+            self.command("put %s-fec_jtag_part_reset 0" % self.target0)
 
 
     def enable(self):
         print("Enabling Peltier control and guardian actions")
-        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg enable" % (self.rbx, self.rbx, self.rbx, self.rbx))
+        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g enable" % (self.rbx, self.rbx, self.rbx))
+        self.command("tput %s-cg enable" % self.target0)
         self.command("tput %s-lg push" % self.rbx)
         self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
 
 
     def errors(self):
         print("Reading link error counters (integrating for %d seconds)" % self.options.nSeconds)
-        fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.target0
+        if hb(self.rbx):
+            fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.target0
+        else:
+            fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.target0
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
         fec1 = self.command(fec)
         ccm1 = self.command(ccm)
