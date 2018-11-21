@@ -231,8 +231,9 @@ class programmer:
         self.command("tput %s-cg disable" % self.target0)
         self.command("put %s-[1-4]-peltier_control 4*0" % self.rbx)
         time.sleep(2)
-        self.command("tput %s-[1-4]-[1-4]-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
-        self.command("tput %s-calib-B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable] enable" % self.rbx)
+        stuff = "B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable]"
+        self.command("tput %s-[1-4]-[1-4]-%s enable" % (self.rbx, stuff))
+        self.command("tput %s-calib-%s enable" % (self.rbx, stuff))
         if hb(self.rbx):
             self.command("tput %s-bkp_jtag_sel %s-sel_sec_jtag enable" % (self.target0, self.target0))
 
@@ -264,16 +265,22 @@ class programmer:
         else:
             fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.target0
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
+        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
+
         fec1 = self.command(fec)
         ccm1 = self.command(ccm)
+        b2b1 = self.command(b2b)
 
         time.sleep(self.options.nSeconds)
         fec2 = self.command(fec)
         ccm2 = self.command(ccm)
-        if fec1 != fec2:
+        b2b2 = self.command(b2b)
+        if fec1 != fec2 or "ERROR" in fec1:
             self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
-        if ccm1 != ccm2:
+        if ccm1 != ccm2 or "ERROR" in ccm1:
             self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
+        if b2b1 != b2b2 or "ERROR" in b2b1:
+            self.bail(["Link errors detected via CCM counters:", b2b1, b2b2])
 
 
     def check_stp(self, stp):
