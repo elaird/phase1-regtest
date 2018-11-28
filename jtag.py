@@ -239,8 +239,7 @@ class programmer:
         stuff = "B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable]"
         self.command("tput %s-[1-4]-[1-4]-%s enable" % (self.rbx, stuff))
         self.command("tput %s-calib-%s enable" % (self.rbx, stuff))
-        if hb(self.rbx):
-            self.command("tput %s-bkp_jtag_sel %s-sel_sec_jtag enable" % (self.target0, self.target0))
+        self.command("tput %s-bkp_jtag_sel %s-sel_sec_jtag enable" % (self.target0, self.target0))
 
 
     def reset_fec(self):
@@ -261,7 +260,6 @@ class programmer:
         self.command("tput %s-cg enable" % self.target0)
         self.command("tput %s-lg push" % self.rbx)
         self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
-        self.errors(store=False)
 
 
     def errors(self, store=True):
@@ -348,13 +346,19 @@ class programmer:
             self.check_for_jtag_errors(lines)
 
 
-    def bail(self, lines=None):
+    def bail(self, lines=[]):
         if lines:
             printer.red("\n".join(lines))
+
         if not self.options.deviceInfoOnly:
             self.enable()
+            self.errors(store=False)
+
         self.disconnect()
-        if not self.options.deviceInfoOnly:
+
+        if lines:
+            sys.exit(" ")  # non-zero return code
+        else:
             sys.exit()
 
 
