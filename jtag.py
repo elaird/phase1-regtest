@@ -108,13 +108,17 @@ def opts():
                       dest="stpJ15",
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_20181126a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_20181126a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -219,6 +223,7 @@ class programmer:
     def ground0(self):
         if self.options.ground0:
             print("Ground stating")
+            self.command("tput %s-lg go_offline" % self.rbx)
             self.command("tput %s-lg ground0" % self.rbx)
             self.command("tput %s-lg waitG" % self.rbx)
             self.command("tput %s-lg push" % self.rbx)
@@ -256,31 +261,35 @@ class programmer:
         self.command("tput %s-cg enable" % self.target0)
         self.command("tput %s-lg push" % self.rbx)
         self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
+        self.errors(store=False)
 
 
-    def errors(self):
-        print("Reading link error counters (integrating for %d seconds)" % self.options.nSeconds)
-        if hb(self.rbx):
-            fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.target0
-        else:
-            fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.target0
+    def errors(self, store=True):
+        msg = "Reading link error counters"
+        if store:
+            msg += " (integrating for %d seconds)" % self.options.nSeconds
+
+        print(msg)
+        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.target0
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
         b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
 
-        fec1 = self.command(fec)
-        ccm1 = self.command(ccm)
-        b2b1 = self.command(b2b)
+        if store:
+            self.fec1 = self.command(fec)
+            self.ccm1 = self.command(ccm)
+            self.b2b1 = self.command(b2b)
+            time.sleep(self.options.nSeconds)
 
-        time.sleep(self.options.nSeconds)
         fec2 = self.command(fec)
         ccm2 = self.command(ccm)
         b2b2 = self.command(b2b)
-        if fec1 != fec2 or "ERROR" in fec1:
-            self.bail(["Link errors detected via FEC counters:", fec1[0], fec2[0]])
-        if ccm1 != ccm2 or "ERROR" in ccm1:
-            self.bail(["Link errors detected via CCM counters:", ccm1[0], ccm2[0]])
-        if b2b1 != b2b2 or "ERROR" in b2b1:
-            self.bail(["Link errors detected via CCM counters:", b2b1, b2b2])
+
+        if self.fec1 != fec2:
+            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]])
+        if self.ccm1 != ccm2:
+            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]])
+        if self.b2b1 != b2b2:
+            self.bail(["Link errors detected via CCM counters:", self.b2b1, b2b2])
 
 
     def check_stp(self, stp):
