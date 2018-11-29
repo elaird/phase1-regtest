@@ -71,8 +71,11 @@ def check_target(target):
     return target, rbx
 
 
-def opts():
-    parser = optparse.OptionParser(usage="usage: %prog [options] FPGA_TARGET \n(implements https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming)")
+def opts(full_rbx=False):
+    target = "RBX" if full_rbx else "FPGA_TARGET"
+    parser = optparse.OptionParser(usage="\n".join(["usage: %prog [options] " + target,
+                                                    "(implements https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming)"
+                                                ]))
     parser.add_option("-H",
                       "--host",
                       dest="host",
@@ -142,13 +145,29 @@ def opts():
                       default=False,
                       action="store_true",
                       help="skip VERIFY")
-    parser.add_option("--program",
-                      dest="program",
+    parser.add_option("--bypass-test",
+                      dest="bypassTest",
                       default=False,
                       action="store_true",
-                      help="do PROGRAM")
+                      help="do BYPASS_TEST")
+    if full_rbx:
+        parser.add_option("--niterations",
+                          dest="nIterations",
+                          metavar="N",
+                          default=2,
+                          type="int",
+                          help="number of tries [default %default]")
+    else:
+        parser.add_option("--program",
+                          dest="program",
+                          default=False,
+                          action="store_true",
+                          help="do PROGRAM")
 
     options, args = parser.parse_args()
+
+    if full_rbx:  # avoid programming entire RBX
+        options.program = False
 
     if len(args) != 1:
         parser.print_help()
@@ -336,6 +355,12 @@ class programmer:
             else:
                 self.action("VERIFY", stp, 140)
 
+        if self.options.bypassTest:
+            if "pulser" in self.target or "neigh" in self.target:
+                pass
+            else:
+                self.action("BYPASS_TEST", stp, 3600)  # one hour!
+
         if self.options.program:
             if self.target.endswith("pulser"):
                 self.action("PROGRAM", stp, 700, key="FSN")
@@ -344,7 +369,7 @@ class programmer:
 
 
     def action(self, word, stp, timeout, key="DSN", check_jtag=True):
-        printer.cyan("%11s with %s (will time out in %3d seconds)" % (word, stp, timeout))
+        printer.cyan("%11s with %s (will time out in %4d seconds)" % (word, stp, timeout))
         lines = ngfec.command(self.server, "jtag %s %s %s" % (stp, self.target, word), timeout=timeout)
         self.check_exit_codes(lines)
         self.check_key(lines, key)
