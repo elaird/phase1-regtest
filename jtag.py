@@ -93,11 +93,13 @@ def opts():
                       dest="stpIglooHe",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass.stp",
                       help="[default %default]")
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
@@ -167,6 +169,7 @@ class programmer:
             self.options.skipVerify = True
             self.options.program = False
             self.jtag()
+            self.bail(minimal=True)
         else:
             self.check_version()
             self.ground0()
@@ -175,8 +178,7 @@ class programmer:
             self.errors()
             self.jtag()
             self.check_version()
-
-        self.bail()
+            self.bail()
 
 
     def connect(self):
@@ -230,11 +232,12 @@ class programmer:
 
 
     def disable(self):
-        print("Disabling Peltier control and guardian actions")
+        print("Disabling Peltier control, guardian actions, and auto power-off")
         # https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming
         self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g disable" % (self.rbx, self.rbx, self.rbx))
         self.command("tput %s-cg disable" % self.target0)
         self.command("put %s-[1-4]-peltier_control 4*0" % self.rbx)
+        self.command("put %s-lg_do_auto_pwr_off 0" % self.target0)
         time.sleep(2)
         stuff = "B_[JTAG_Select_FPGA,JTAGSEL,JTAG_Select_Board,Bottom_TRST_N,Top_TRST_N,Bottom_RESET_N,Top_RESET_N,Igloo_VDD_Enable]"
         self.command("tput %s-[1-4]-[1-4]-%s enable" % (self.rbx, stuff))
@@ -255,11 +258,12 @@ class programmer:
 
 
     def enable(self):
-        print("Enabling Peltier control and guardian actions")
+        print("Enabling Peltier control, guardian actions, and auto power-off")
         self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g enable" % (self.rbx, self.rbx, self.rbx))
         self.command("tput %s-cg enable" % self.target0)
         self.command("tput %s-lg push" % self.rbx)
         self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
+        self.command("put %s-lg_do_auto_pwr_off 1" % self.target0)
 
 
     def errors(self, store=True):
@@ -282,12 +286,14 @@ class programmer:
         ccm2 = self.command(ccm)
         b2b2 = self.command(b2b)
 
+        minimal = not store
+
         if self.fec1 != fec2:
-            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]])
+            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal)
         if self.ccm1 != ccm2:
-            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]])
+            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal)
         if self.b2b1 != b2b2:
-            self.bail(["Link errors detected via CCM counters:", self.b2b1, b2b2])
+            self.bail(["Link errors detected via CCM counters:", self.b2b1, b2b2], minimal)
 
 
     def check_stp(self, stp):
@@ -346,11 +352,11 @@ class programmer:
             self.check_for_jtag_errors(lines)
 
 
-    def bail(self, lines=[]):
+    def bail(self, lines=[], minimal=False):
         if lines:
             printer.red("\n".join(lines))
 
-        if not self.options.deviceInfoOnly:
+        if not minimal:
             self.enable()
             self.errors(store=False)
 
