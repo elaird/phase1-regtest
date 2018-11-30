@@ -96,13 +96,13 @@ def opts(full_rbx=False):
                       dest="stpIglooHe",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass_div8.stp",
                       help="[default %default]")
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
@@ -359,7 +359,7 @@ class programmer:
             if "pulser" in self.target or "neigh" in self.target:
                 pass
             else:
-                self.action("BYPASS_TEST", stp, 3600)  # one hour!
+                self.action("BYPASS_TEST", stp, 240, key="IDCODE")
 
         if self.options.program:
             if self.target.endswith("pulser"):
@@ -377,7 +377,9 @@ class programmer:
             self.check_for_jtag_errors(lines)
 
 
-    def bail(self, lines=[], minimal=False):
+    def bail(self, lines=[], minimal=False, note=""):
+        if note:
+            printer.purple(note)
         if lines:
             printer.red("\n".join(lines))
 
@@ -395,9 +397,9 @@ class programmer:
 
     def check_exit_codes(self, lines):
         if not lines[-2].endswith("# retcode=0"):
-            self.bail(lines)
+            self.bail(lines, note="retcode")
         if lines[-4] != 'Exit code = 0... Success':
-            self.bail(lines)
+            self.bail(lines, note="exitcode")
 
 
     def check_key(self, lines, key):
@@ -411,17 +413,15 @@ class programmer:
                     return
             except ValueError:
                 continue
-        self.bail(lines)
+        self.bail(lines, note="key")
 
 
     def check_for_jtag_errors(self, lines):
         for line in lines:
             if "Authentication Error" in line:
-                print "WAT1"
-                self.bail(lines)
+                self.bail(lines, note="auth")
             if "Invalid/Corrupted programming file" in line:
-                print "WAT2"
-                self.bail(lines)
+                self.bail(lines, note="invalid")
             if "ERROR_CODE" in line:
                 fields = line.split()
                 value = fields[-1]
@@ -429,7 +429,7 @@ class programmer:
                     if int(value, 16):
                         self.bail(lines)
                 except ValueError:
-                    self.bail(lines)
+                    self.bail(lines, note="errorcode")
 
 
 if __name__ == "__main__":
