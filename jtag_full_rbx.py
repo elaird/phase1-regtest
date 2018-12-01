@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
 import collections, subprocess, sys
-import jtag
+import jtag, printer
 
 
 def commandOutputFull(cmd):
@@ -23,7 +23,7 @@ def targets(rbx):
     return out
 
 
-def results(rbx, args, nIterations):
+def results_subprocess(rbx, args, nIterations):
     out = collections.defaultdict(list)
     for fpga in targets(rbx):
         target = "%s-%s" % (rbx, fpga)
@@ -41,9 +41,34 @@ def results(rbx, args, nIterations):
     return out
 
 
+def one(target, options):
+    out = []
+    for i in range(options.nIterations):
+        try:
+            jtag.programmer(options, target)
+            out.append(0)
+        except RuntimeError as e:
+            printer.red(str(e))
+            out.append(1)
+    return out
+
+
+def results(rbx, options):
+    out = collections.defaultdict(list)
+    for fpga in targets(rbx):
+        target = "%s-%s" % (rbx, fpga)
+        options.logfile = "%s.log" % target
+        try:
+            out[target] += one(target, options)
+        except KeyboardInterrupt:
+            break
+
+    return out
+
+
 def main(options, rbx):
-    args = " ".join(sys.argv[1:])
-    res = results(rbx, args, options.nIterations).items()
+    # res = results_subprocess(rbx, " ".join(sys.argv[1:]), options.nIterations).items()
+    res = results(rbx, options).items()
     if not res:
         return
 
