@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import collections
+import collections, datetime, pickle, os
 import jtag, printer
 
 
@@ -42,11 +42,24 @@ def results(rbx, options):
     return out
 
 
-def main():
-    options, rbx = jtag.opts(full_rbx=True)
-    res = results(rbx, options).items()
-    if not res:
-        return
+def pickled(rbx):
+    return "%s.pickle" % rbx
+
+
+def record(rbx, options):
+    filename = pickled(rbx)
+    if os.path.exists(filename):
+        backup = "%s.moved.on.%s" % (filename, datetime.datetime.today().strftime("%Y-%m-%d-%H:%M:%S"))
+        os.rename(filename, backup)
+
+    with open(filename, "w") as f:
+        pickle.dump(results(rbx, options), f)
+    print("Wrote results to %s" % filename)
+
+
+def report(rbx, options):
+    with open(pickled(rbx), "r") as f:
+        res = pickle.load(f).items()
 
     if options.bypassTest:  # FIXME
         print("\n" * 2)
@@ -58,6 +71,13 @@ def main():
         print("-" * 51)
         for key, codes in sorted(res):
             print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
+
+
+def main():
+    options, rbx = jtag.opts(full_rbx=True)
+    if options.nIterations:
+        record(rbx, options)
+    report(rbx, options)
 
 
 if __name__ == "__main__":
