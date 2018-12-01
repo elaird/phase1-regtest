@@ -108,7 +108,9 @@ def opts(full_rbx=False):
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
                       metavar="a.stp",
-                      default="/nfshome0/elaird/firmware/HE_Pulser_Ver6_fixed_FREQ_1.stp",
+                      # default="/nfshome0/elaird/firmware/HE_Pulser_Ver6_fixed_FREQ_1.stp",
+                      default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ1.stp",
+                      # default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ4.stp",
                       help="[default %default]")
     parser.add_option("--stp-J15",
                       dest="stpJ15",
@@ -375,8 +377,8 @@ class programmer:
             self.check_for_jtag_errors(lines)
 
 
-    def bail(self, lines=[], minimal=False, note=""):
-        if note and lines:
+    def bail(self, lines=[], minimal=False, note="unspecified"):
+        if lines:
             printer.purple("Exiting due to \"%s\"" % note)
 
         if not minimal:
@@ -386,7 +388,7 @@ class programmer:
         self.disconnect()
 
         if lines:
-            raise RuntimeError("\n".join(lines))
+            raise RuntimeError(note, "\n".join(lines))
 
 
     def check_exit_codes(self, lines):
@@ -430,7 +432,7 @@ def main():
     try:
         programmer(*opts())
     except RuntimeError as e:
-        printer.red(str(e))
+        printer.red(e[1])
         sys.exit(" ")
 
 
