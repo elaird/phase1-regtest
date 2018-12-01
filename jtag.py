@@ -96,7 +96,8 @@ def opts(full_rbx=False):
                       dest="stpIglooHe",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
@@ -179,25 +180,22 @@ def opts(full_rbx=False):
 class programmer:
     def __init__(self, options, target):
         self.options = options
+        if self.options.deviceInfoOnly:
+            self.options.skipVerify = True
+            self.options.program = False
+            functions = ["jtag"]
+        else:
+            functions = ["check_version", "ground0", "disable", "reset_fec", "errors", "jtag", "check_version"]
+
         self.target, self.rbx = check_target(target)
         self.target0 = self.target.split("-")[0]
 
         self.connect()
 
-        if self.options.deviceInfoOnly:
-            self.options.skipVerify = True
-            self.options.program = False
-            self.jtag()
-            self.bail(minimal=True)
-        else:
-            self.check_version()
-            self.ground0()
-            self.disable()
-            self.reset_fec()
-            self.errors()
-            self.jtag()
-            self.check_version()
-            self.bail()
+        for name in functions:
+            getattr(self, name)()
+
+        self.bail(minimal=self.options.deviceInfoOnly)
 
 
     def connect(self):
@@ -347,7 +345,7 @@ class programmer:
         if self.target.endswith("pulser"):
             self.action("DEVICE_INFO", stp, 30, key="FSN", check_jtag=False)
         else:
-            self.action("DEVICE_INFO", stp, 30, check_jtag=False)
+            self.action("DEVICE_INFO", stp, 30)
 
         if not self.options.skipVerify:
             if self.target.endswith("pulser"):
@@ -378,10 +376,8 @@ class programmer:
 
 
     def bail(self, lines=[], minimal=False, note=""):
-        if note:
-            printer.purple(note)
-        if lines:
-            printer.red("\n".join(lines))
+        if note and lines:
+            printer.purple("Exiting due to \"%s\"" % note)
 
         if not minimal:
             self.enable()
@@ -390,9 +386,7 @@ class programmer:
         self.disconnect()
 
         if lines:
-            sys.exit(" ")  # non-zero return code
-        else:
-            sys.exit()
+            raise RuntimeError("\n".join(lines))
 
 
     def check_exit_codes(self, lines):
@@ -432,5 +426,13 @@ class programmer:
                     self.bail(lines, note="errorcode")
 
 
+def main():
+    try:
+        programmer(*opts())
+    except RuntimeError as e:
+        printer.red(str(e))
+        sys.exit(" ")
+
+
 if __name__ == "__main__":
-    p = programmer(*opts())
+    main()
