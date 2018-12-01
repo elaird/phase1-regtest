@@ -1,13 +1,7 @@
 #!/usr/bin/env python2
 
-import collections, subprocess, sys
+import collections
 import jtag, printer
-
-
-def commandOutputFull(cmd):
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    return {"stdout": stdout, "stderr": stderr, "returncode": p.returncode}
 
 
 def targets(rbx):
@@ -23,33 +17,15 @@ def targets(rbx):
     return out
 
 
-def results_subprocess(rbx, args, nIterations):
-    out = collections.defaultdict(list)
-    for fpga in targets(rbx):
-        target = "%s-%s" % (rbx, fpga)
-        cmd = "./jtag.py %s --log-file=%s.log" % (args.replace(rbx, target), target)
-
-        try:
-            for i in range(nIterations):
-                print(cmd)
-                d = commandOutputFull(cmd)
-                out[target].append(d["returncode"])
-                print d["stdout"]
-        except KeyboardInterrupt:
-            break
-
-    return out
-
-
 def one(target, options):
     out = []
     for i in range(options.nIterations):
         try:
             jtag.programmer(options, target)
-            out.append(0)
+            out.append(None)
         except RuntimeError as e:
-            printer.red(str(e))
-            out.append(1)
+            printer.red(e[1])
+            out.append(e)
     return out
 
 
@@ -66,17 +42,23 @@ def results(rbx, options):
     return out
 
 
-def main(options, rbx):
-    # res = results_subprocess(rbx, " ".join(sys.argv[1:]), options.nIterations).items()
+def main():
+    options, rbx = jtag.opts(full_rbx=True)
     res = results(rbx, options).items()
     if not res:
         return
 
-    print("\n" * 2)
-    print("-" * 51)
-    for key, codes in sorted(res):
-        print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(0), len(codes)))
+    if options.bypassTest:  # FIXME
+        print("\n" * 2)
+        print("-" * 51)
+        for key, codes in sorted(res):
+            print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
+    else:
+        print("\n" * 2)
+        print("-" * 51)
+        for key, codes in sorted(res):
+            print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
 
 
 if __name__ == "__main__":
-    main(*jtag.opts(full_rbx=True))
+    main()
