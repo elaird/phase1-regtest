@@ -108,9 +108,8 @@ def opts(full_rbx=False):
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
                       metavar="a.stp",
-                      # default="/nfshome0/elaird/firmware/HE_Pulser_Ver6_fixed_FREQ_1.stp",
-                      default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ1.stp",
-                      # default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ4.stp",
+                      # default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ1.stp",
+                      default="/nfshome0/elaird/firmware/HE_Pulser_ASIC_v7_FIXED_FREQ4.stp",
                       help="[default %default]")
     parser.add_option("--stp-J15",
                       dest="stpJ15",
@@ -308,11 +307,11 @@ class programmer:
         minimal = not store
 
         if self.fec1 != fec2:
-            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal)
+            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal=minimal, note="fec_ber")
         if self.ccm1 != ccm2:
-            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal)
+            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal=minimal, note="ccm_ber")
         if self.b2b1 != b2b2:
-            self.bail(["Link errors detected via CCM counters:", self.b2b1, b2b2], minimal)
+            self.bail(["Link errors detected via CCM counters:", self.b2b1, b2b2], minimal=minimal, note="b2b_ber")
 
 
     def check_stp(self, stp):
