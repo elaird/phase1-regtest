@@ -6,14 +6,14 @@ import jtag, printer
 
 def targets(rbx):
     out = []
-    if not rbx.startswith("HE"):
-        return out
-
-    out = []
     for iRm in range(1, 5):
         for iCard in range(1, 5):
-            out.append("%d-%d" % (iRm, iCard))
-    # out += ["neigh", "calib", "pulser"]
+            if rbx.startswith("HE"):
+                out.append("%d-%d" % (iRm, iCard))
+            if rbx.startswith("HB"):
+                out.append("%d-%d-iTop" % (iRm, iCard))
+                out.append("%d-%d-iBot" % (iRm, iCard))
+        # out += ["neigh", "calib", "pulser"]
     return out
 
 
