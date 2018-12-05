@@ -58,19 +58,15 @@ def record(rbx, options):
 
 
 def report(rbx, options):
-    with open(pickled(rbx), "r") as f:
-        res = pickle.load(f).items()
+    filename = pickled(rbx)
+    with open(filename, "r") as f:
+        res = pickle.load(f)
 
-    if options.bypassTest:  # FIXME
-        print("\n" * 2)
-        print("-" * 51)
-        for key, codes in sorted(res):
-            print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
-    else:
-        print("\n" * 2)
-        print("-" * 51)
-        for key, codes in sorted(res):
-            print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
+    print("-" * 51)
+    for key, codes in sorted(res.items()):
+        print("%15s: %2d success(es) out of %2d attempts" % (key, codes.count(None), len(codes)))
+    if options.bypassTest and any(res.values()):
+        print("\nFor more information about the bypass test failures, run\n./xor.py %s" % filename)
 
 
 def main():
