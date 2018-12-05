@@ -1,16 +1,27 @@
 #!/usr/bin/env python2
 
-import ROOT as r
-import sys
+import optparse, pickle, sys
 
 
-def pairs(filename):
+def list_of_pairs(filename):
+    out = []
+    with open(filename) as f:
+        try:
+            for key, results in sorted(pickle.load(f).items()):
+                for iResult, result in enumerate(results):
+                    if result is None:
+                        continue
+                    out.append((key, iResult, pairs(result[1])))
+        except KeyError:
+            return [pairs(f.read())]
+    return out
+
+
+def pairs(lines):
+    lines = lines.split("\n")
+
     out = {}
-    f = open(filename)
-    for iLine, line in enumerate(f):
-        if not iLine:
-            continue
-        
+    for iLine, line in enumerate(lines):
         if "blockNo:" in line:
             blockLine = line
 
@@ -25,8 +36,12 @@ def pairs(filename):
             blockNo = int(blockNo)
             regBits = int(regBits, 16)
             actBits = int(actBits, 16)
-            out[blockNo] = (regBits, actBits)
-    f.close()
+
+            xor = regBits ^ actBits
+            # ignore LSB
+            xor >>= 1
+            xor <<= 1
+            out[blockNo] = (regBits, actBits, xor)
     return out
 
 
@@ -43,8 +58,12 @@ def fill_location(h, number, maxBits):
             h.Fill(iBit)
 
 
-def main(filename):
-    nBitsMax = 128
+def one(d, nBitsMax):
+    import ROOT as r
+    r.gROOT.SetBatch(True)
+    r.gStyle.SetOptStat("ourme")
+    r.gErrorIgnoreLevel = r.kWarning
+
     hMis = r.TH1D("nMismatch", ";# bits mismatched;# blocks", nBitsMax, 0.5, nBitsMax + 0.5)
     hDelta = r.TH1D("deltaBlocks", ";# blocks since previous mismatch;entries", 100, 0.0, 5.e3)
     hLocAll = r.TH1D("iLocAll", ";bit number;# blocks", nBitsMax, -0.5, nBitsMax - 0.5)
@@ -53,7 +72,6 @@ def main(filename):
         hLocs.append(r.TH1D("iLoc%d" % i, "blocks with exactly %d mismatched bit%s;bit number;# mismatches" % (i, "s" if 1 < i else ""),
                             nBitsMax, -0.5, nBitsMax - 0.5))
 
-    d = pairs(filename)
     header = "   block      delta   regBits^actBits (zero-ing LSB)"
     print header
     print "-" * 56
@@ -65,11 +83,7 @@ def main(filename):
         else:
             delta = None
 
-        regBits, actBits = d[blockNo]
-        xor = regBits ^ actBits
-        # ignore LSB
-        xor >>= 1
-        xor <<= 1
+        regBits, actBits, xor = d[blockNo]
 
         print "   ".join(["%8d" % blockNo,
                           " " * 8 if delta is None else "%8d" % delta,
@@ -108,10 +122,71 @@ def main(filename):
     can.Print(pdf + "]")    
 
 
+def multi(lst, nBitsMax):
+    header1 = "|                                        |        *median values*        |"
+    header2 = "|  target   it    n    block1    blockN  |     block     delta  nBitsXor |"
+    topbar = "+%s+" % ("-" * (len(header1) - 2))
+    bar = topbar.replace("+", "|")
+    print topbar
+    print header1
+    print header2
+    print bar
+
+    for (key, iteration, d) in lst:
+        blocks = sorted(d.keys())
+        if not blocks:
+            continue
+        iBlockMin = min(blocks)
+        iBlockMax = max(blocks)
+        iBlockMed = blocks[len(blocks) / 2]
+
+        deltas = []
+        nMismatched = []
+        for iEntry, blockNo in enumerate(blocks):
+            if iEntry:
+                deltas.append(blockNo - blocks[iEntry - 1])
+            regBits, actBits, xor = d[blockNo]
+            nMismatched.append(nBits(xor, nBitsMax))
+
+        deltas.sort()
+        nMismatched.sort()
+        print "  ".join(["| %s" % key,
+                         "%2d" % iteration,
+                         " %2d" % len(blocks),
+                         "%8d" % iBlockMin,
+                         "%8d" % iBlockMax,
+                         "|",
+                         "%8d" % iBlockMed,
+                         ("%8d" % deltas[len(deltas) / 2]) if deltas else " " * 8,
+                         "%5d  " % nMismatched[len(deltas) / 2],
+                         "|",
+                         ])
+    print(topbar)
+
+
+def opts():
+    parser = optparse.OptionParser("usage: %prog FILE ")
+    parser.add_option("--n-bits-max",
+                      dest="nBitsMax",
+                      default=128,
+                      type="int",
+                      help="number of bits to consider per block [default %default]")
+    options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.print_help()
+        sys.exit(" ")
+
+    return options, args[0]
+
+
+def main(options, filename):
+    lst = list_of_pairs(filename)
+    if len(lst) == 1:
+        one(lst[0], options.nBitsMax)
+    else:
+        multi(lst, options.nBitsMax)
+
+
 if __name__ == "__main__":
-    r.gROOT.SetBatch(True)
-    r.gStyle.SetOptStat("ourme")
-    r.gErrorIgnoreLevel = r.kWarning
-    if len(sys.argv) < 2:
-        sys.exit("Provide a file name as an argument.")
-    main(filename=sys.argv[1])
+    main(*opts())
