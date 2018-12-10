@@ -10,7 +10,7 @@ def sector(rbx, b904=False):
         return None
 
     if rbx[:2] not in ["HB", "HE", "HF"]:
-        sys.exit("This script only works with HB, HE, HF, or lasermon RBXes.")
+        sys.exit("This script only works with HB, HE, HF, lasermon, or ZDC RBXes.")
 
     if (not b904) and (rbx[2] not in "MP"):
         sys.exit("This script only works with P or M RBXes (unless at 904).")
@@ -155,25 +155,14 @@ class commissioner:
             if self.end in "MP":
                 self.sector = sector(self.rbx)
         elif self.he:
-            if self.end == "M":
-                self.sector = sector(self.rbx)
-                self.host = "hcalngccm02"
-                if self.sector >= 20:
-                    self.port = 64100
-                else:
-                    self.port = 64000
-            elif self.end == "P":
-                self.sector = sector(self.rbx)
-                if self.sector >= 20:
-                    self.host = "hcalngccm02"
-                    self.port = 64100
-                else:
-                    self.host = "hcalngccm03"
-                    self.port = 64100
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                self.host = "hcal904daq04"
-                self.port = 64000
+            self.host = "hcalngccm02"
+            self.sector = sector(self.rbx)
+            self.port = 64000
+
+            # else:  # assume 904
+            #     self.sector = sector(self.rbx, True)
+            #     self.host = "hcal904daq04"
+            #     self.port = 64000
         elif self.hf:
             self.sector = sector(self.rbx)
             self.host = "hcalngccm01"
@@ -272,30 +261,42 @@ class commissioner:
         sfp = 99
 
         if self.he:
-            fw = (3, 1, 2, 0x14032018)
-            offset = 0 if self.end == "M" else 3
-            sfp = 2 + (self.sector - 1) % 6
-            if 1 <= self.sector <= 6:
-                fecs = "hefec%d" % (1 + offset)
-            elif 7 <= self.sector <= 12:
-                fecs = "hefec%d" % (2 + offset)
-            elif 13 <= self.sector <= 18:
-                fecs = "hefec%d" % (3 + offset)
-            elif self.rbx == "HEP30":
-                fecs = "hefec7"
-                sfp = 2
-            elif self.rbx == "HEM35":
-                fecs = "hefec7"
-                sfp = 3
-            elif self.rbx == "HEM36":
-                fecs = "hefec7"
-                sfp = 4
-            elif self.rbx == "HEM29":
-                fecs = "hefec7"
-                sfp = 5
-            elif self.sector == 0 and self.he and "904" in self.host:
-                fecs = "hefec1"
-                sfp = 2
+            fw = (4, 2, 0xd, 0x9182018)
+            if self.end == "M":
+                if self.sector in [9, 29]:
+                    fw = (3, 1, 2, 0x14032018)
+                    fecs = "hefec7"
+                    sfp = 7 if self.sector == 9 else 3
+                elif self.sector <= 12:
+                    fecs = "hefec2"
+                    sfp = self.sector
+                else:
+                    fecs = "hefec2"
+                    sfp = self.sector - 11
+            if self.end == "P":
+                if self.sector in [10, 30]:
+                    fw = (3, 1, 2, 0x14032018)
+                    fecs = "hefec7"
+                    sfp = 6 if self.sector == 10 else 2
+                elif self.sector <= 6:
+                    fecs = "hefec3"
+                    sfp = self.sector + 6
+                else:
+                    fecs = "hefec4"
+                    sfp = self.sector - 6
+
+            # elif self.rbx == "HEM35":
+            #     fecs = "hefec7"
+            #     sfp = 3
+            # elif self.rbx == "HEM36":
+            #     fecs = "hefec7"
+            #     sfp = 4
+            # elif self.rbx == "HEM29":
+            #     fecs = "hefec7"
+            #     sfp = 5
+            # elif self.sector == 0 and self.he and "904" in self.host:
+            #     fecs = "hefec1"
+            #     sfp = 2
         elif self.hf:
             fw = (3, 1, 2, 0x16042018)
             if self.end == "M" and 1 <= self.sector <= 6:
@@ -423,9 +424,9 @@ class commissioner:
         items = []
 
         if self.rbx == "lasermon" or self.rbx == "ZDCM":
-            sites = [2, 3, 4]
+            sites = [3, 5]
         elif self.rbx == "ZDCP":
-            sites = [3, 4]
+            sites = [3, 5]
         else:
             sites = [3, 4, 5, 6, 10, 11, 12, 13, 14]
 
@@ -561,6 +562,7 @@ class commissioner:
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
             link, power, bad8b10b, bc0, h1, write_delay, read_delay, fifo_occ, bprv, h2, bad_full, invalid, h3 = lines.split("\n")
             iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ)
+            # iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, write_delay)
             out.append((self.sector, crate, slot, ppod, items[iStart:iEnd]))
             if not check:
                 continue
@@ -768,7 +770,7 @@ class commissioner:
 
     def errors(self):
         print("Reading control link error counters (integrating for %d seconds)" % self.options.nSeconds)
-        fec = "get %s-fec_[rx_prbs_error,rxlos,dv_down,rx_raw_error]_cnt_rr" % self.rbx
+        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.rbx
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
         b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
 
