@@ -9,7 +9,6 @@ class driver:
         self.options = options
         self.rbx = target
         self.target = target
-        self.target0 = target + "0"
 
         self.connect()
         self.bail()
@@ -24,10 +23,15 @@ class driver:
         if store:
             msg += " (integrating for %d seconds)" % self.options.nSeconds
 
+        if hasattr(self, "target0"):
+            target0 = self.target0
+        else:
+            target0 = self.rbx
+
         print(msg)
-        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.target0
-        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
-        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.target0
+        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % target0
+        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % target0
+        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
 
         if store:
             self.fec1 = self.command(fec)
