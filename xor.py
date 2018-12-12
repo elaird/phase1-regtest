@@ -123,8 +123,8 @@ def one(d, nBitsMax):
 
 
 def multi(lst, nBitsMax):
-    header1 = "|                                        |        *median values*        |"
-    header2 = "|  target   it    n    block1    blockN  |     block     delta  nBitsXor |"
+    header1 = "|                                              |        *median values*        |"
+    header2 = "|  target        iter   N    block1    blockN  |     block     delta  nBitsXor |"
     topbar = "+%s+" % ("-" * (len(header1) - 2))
     bar = topbar.replace("+", "|")
     print topbar
@@ -150,8 +150,8 @@ def multi(lst, nBitsMax):
 
         deltas.sort()
         nMismatched.sort()
-        print "  ".join(["| %s" % key,
-                         "%2d" % iteration,
+        print "  ".join(["| %13s" % key,
+                         " %2d" % iteration,
                          " %2d" % len(blocks),
                          "%8d" % iBlockMin,
                          "%8d" % iBlockMax,
