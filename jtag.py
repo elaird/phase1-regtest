@@ -84,8 +84,7 @@ def opts(full_rbx=False):
     parser.add_option("-p",
                       "--port",
                       dest="port",
-                      # default=64000,
-                      default=64200,
+                      default=64000,
                       type="int",
                       help="ngccmserver port number [default %default]")
     parser.add_option("--log-file",
@@ -96,14 +95,23 @@ def opts(full_rbx=False):
                       dest="stpIglooHe",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq.stp",
+                      help="[default %default]")
+    parser.add_option("--stp-igloo-HE-bypass-test",
+                      dest="stpIglooHeBypassTest",
+                      metavar="a.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10.stp",  # always fails bypass_test
+                      default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
                       metavar="a.stp",
                       default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03.stp",
-                      # default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass_div8.stp",
+                      help="[default %default]")
+    parser.add_option("--stp-igloo-HB-bypass-test",
+                      dest="stpIglooHbBypassTest",
+                      metavar="a.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass_div8_max10.stp",  # always fails bypass_test
+                      default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03_w_bypass_div8_max10_freq.stp",
                       help="[default %default]")
     parser.add_option("--stp-pulser",
                       dest="stpPulser",
@@ -342,8 +350,10 @@ class programmer:
             print(mezz)
         elif self.target.endswith("pulser"):
             stp = self.options.stpPulser
+        elif hb(self.rbx):
+            stp = self.options.stpIglooHbBypassTest if self.options.bypassTest else self.options.stpIglooHb
         else:
-            stp = self.options.stpIglooHb if hb(self.rbx) else self.options.stpIglooHe
+            stp = self.options.stpIglooHeBypassTest if self.options.bypassTest else self.options.stpIglooHe
 
         self.check_stp(stp)
 
