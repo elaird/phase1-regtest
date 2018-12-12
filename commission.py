@@ -18,6 +18,8 @@ def sector(rbx, b904=False):
     try:
         if b904:
             s = rbx[2:]
+            if s.endswith("R"):
+                s = s[:-1]
         else:
             s = rbx[3:]
         number = int(s)
@@ -154,15 +156,17 @@ class commissioner:
         if self.hb:
             if self.end in "MP":
                 self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                self.host = "hcal904daq04"
+                self.port = 64400
         elif self.he:
-            self.host = "hcalngccm02"
-            self.sector = sector(self.rbx)
-            self.port = 64000
-
-            # else:  # assume 904
-            #     self.sector = sector(self.rbx, True)
-            #     self.host = "hcal904daq04"
-            #     self.port = 64000
+            if self.end in "MP":
+                self.host = "hcalngccm02"
+                self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                self.host = "hcal904daq04"
         elif self.hf:
             self.sector = sector(self.rbx)
             self.host = "hcalngccm01"
@@ -255,7 +259,8 @@ class commissioner:
 
 
     def fec(self):
-        # http://cmsonline.cern.ch/cms-elog/1030680
+        # USC: http://cmsonline.cern.ch/cms-elog/1077160
+        # 904: http://cmsonline.cern.ch/cms-elog/1077547
 
         fecs = "unknown"
         sfp = 99
@@ -285,18 +290,16 @@ class commissioner:
                     fecs = "hefec4"
                     sfp = self.sector - 6
 
-            # elif self.rbx == "HEM35":
-            #     fecs = "hefec7"
-            #     sfp = 3
-            # elif self.rbx == "HEM36":
-            #     fecs = "hefec7"
-            #     sfp = 4
-            # elif self.rbx == "HEM29":
-            #     fecs = "hefec7"
-            #     sfp = 5
-            # elif self.sector == 0 and self.he and "904" in self.host:
-            #     fecs = "hefec1"
-            #     sfp = 2
+            elif self.rbx == "HE0":
+                fw = (3, 1, 2, 0x14032018)
+                fecs = "hefec1"
+                sfp = 2
+            elif self.rbx == "HE25":
+                fecs = "hefec5"
+                sfp = 1
+            elif self.rbx == "HE25R":
+                fecs = "hefec5"
+                sfp = 2
         elif self.hf:
             fw = (3, 1, 2, 0x16042018)
             if self.end == "M" and 1 <= self.sector <= 6:
