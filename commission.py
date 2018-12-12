@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import jtag, ngfec, printer
+import driver, ngfec, printer
 from powerMon import commandOutputFull
 import datetime, optparse, os, sys, time
 
@@ -59,11 +59,6 @@ def opts():
                       default=False,
                       action="store_true",
                       help="assume that J14 is connected to FEC")
-    parser.add_option("--device-info",
-                      dest="device_info",
-                      default=False,
-                      action="store_true",
-                      help="check JTAG device info")
     parser.add_option("--qiecards",
                       dest="qiecards",
                       default=False,
@@ -109,11 +104,6 @@ def opts():
                       default=False,
                       action="store_true",
                       help="continue even when encountering error condions")
-    parser.add_option("--enable",
-                      dest="enable",
-                      default=False,
-                      action="store_true",
-                      help="enable guardians")
 
     options, args = parser.parse_args()
 
@@ -138,10 +128,14 @@ def uhtr_tool_link_status(crate, slot1, slot2, he):
     return lines
 
 
-class commissioner:
+class commissioner(driver.driver):
     def __init__(self, options, target):
-        self.options = options
         self.rbx = target
+
+        self.options = options
+        if not self.options.logfile:
+            self.options.logfile = self.rbx + ".log"
+
         self.hb = self.rbx.startswith("HB")
         self.he = self.rbx.startswith("HE")
         self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
@@ -150,28 +144,7 @@ class commissioner:
         else:
             self.end = self.rbx[2]
 
-        self.host = "localhost"
-        self.port = 64000
-
-        if self.hb:
-            if self.end in "MP":
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                self.host = "hcal904daq04"
-                self.port = 64400
-        elif self.he:
-            if self.end in "MP":
-                self.host = "hcalngccm02"
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                self.host = "hcal904daq04"
-        elif self.hf:
-            self.sector = sector(self.rbx)
-            self.host = "hcalngccm01"
-            self.port = 63000
-
+        self.assign_sector_host_port()
 
         fe = False
         for attr in dir(self.options):
@@ -187,14 +160,9 @@ class commissioner:
         if fe:
             self.connect()
 
-        if self.options.enable:
-            self.enable()
-
         if options.guardians:
             self.guardians()
 
-        if options.device_info:
-            self.device_info()
 
         if (self.he or self.hf) and options.fec:
             self.fec()
@@ -230,32 +198,36 @@ class commissioner:
             self.disconnect()
 
 
+    def assign_sector_host_port(self):
+        host = "localhost"
+        port = 64000
+
+        if self.hb:
+            if self.end in "MP":
+                self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                host = "hcal904daq04"
+                port = 64400
+        elif self.he:
+            if self.end in "MP":
+                host = "hcalngccm02"
+                self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                host = "hcal904daq04"
+        elif self.hf:
+            self.sector = sector(self.rbx)
+            host = "hcalngccm01"
+            port = 63000
+
+        # driver.connect assumes these are included as options
+        self.options.host = host
+        self.options.port = port
+
+
     def guardians(self):
         print self.command("table\ntget %s-lg fns3G" % self.rbx)
-
-
-    def device_info(self):
-        opts2, _ = jtag.opts()
-        opts2.host = self.host
-        opts2.port = self.port
-        opts2.logfile = self.options.logfile
-
-        targets = ["%s-neigh" % self.rbx, "%s-pulser" % self.rbx]
-        for iRm in range(1, 6):
-            for iQieCard in range(1, 5):
-                if iRm == 5:
-                    if iQieCard == 1:
-                        stem = "calib"
-                    else:
-                        continue
-                else:
-                    stem = "%d-%d" % (iRm, iQieCard)
-
-                targets.append("%s-%s" % (self.rbx, stem))
-
-        for target in targets:
-            print target
-            p = jtag.programmer(opts2, target)
 
 
     def fec(self):
@@ -353,19 +325,23 @@ class commissioner:
         if self.he:
             if self.options.j14:
                 lst = [("mezz_GEO_ADDR", 1, None),
-                       ("mezz_scratch", None, None),
-                       ("smezz_scratch", None, None),
+                       ("mezz_MASTER_J14_ENABLE", None, None),
+                       ("smezz_MASTER_J14_ENABLE", None, None),
                        ("mezz_FPGA_SILSIG", fw14, None),
                        ("smezz_FPGA_SILSIG", fw15, None),
+                       ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
                        ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
                 ]
             else:
                 lst = [("mezz_GEO_ADDR", 2, None),
+                       ("mezz_MASTER_J14_ENABLE", None, None),
+                       ("smezz_MASTER_J14_ENABLE", None, None),
                        ("mezz_scratch", None, None),
                        ("smezz_scratch", None, None),
                        ("mezz_FPGA_SILSIG", fw15, None),
                        ("smezz_FPGA_SILSIG", fw14, None),
                        ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
+                       ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
                 ]
 
             temp = 35.0
@@ -679,30 +655,6 @@ class commissioner:
         return iStart, iEnd, items
 
 
-    def connect(self):
-        if not self.options.logfile:
-            self.options.logfile = self.rbx + ".log"
-        self.logfile = open(self.options.logfile, "a")
-        printer.gray("Appending to %s" % self.options.logfile)
-        h = "-" * 30 + "\n"
-        self.logfile.write(h)
-        self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
-        self.logfile.write(h)
-
-        # ngfec.survey_clients()
-        # ngfec.kill_clients()
-        self.server = ngfec.connect(self.host, self.port, self.logfile)
-
-
-    def disconnect(self):
-        ngfec.disconnect(self.server)
-        self.logfile.close()
-
-
-    def command(self, cmd):
-        return ngfec.command(self.server, cmd)[0]
-
-
     def check(self, items, device=None):
         for item, expected, threshold in items:
             if device is None:
@@ -762,36 +714,6 @@ class commissioner:
                 if msg:
                     lines.insert(0, msg)
                 self.bail(lines)
-
-
-    def enable(self):
-        print("Enabling Peltier control and guardian actions")
-        self.command("tput %s-[1-4]-g  %s-[1-4]s-sg  %s-calib-g %s-cg enable" % (self.rbx, self.rbx, self.rbx, self.rbx))
-        self.command("tput %s-lg push" % self.rbx)
-        self.command("put %s-[1-4]-peltier_control 4*1" % self.rbx)
-
-
-    def errors(self):
-        print("Reading control link error counters (integrating for %d seconds)" % self.options.nSeconds)
-        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % self.rbx
-        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
-        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % self.rbx
-
-        fec1 = self.command(fec)
-        ccm1 = self.command(ccm)
-        b2b1 = self.command(b2b)
-
-        time.sleep(self.options.nSeconds)
-        fec2 = self.command(fec)
-        ccm2 = self.command(ccm)
-        b2b2 = self.command(b2b)
-
-        if fec1 != fec2 or "ERROR" in fec1:
-            self.bail(["Link errors detected via FEC counters:", fec1, fec2])
-        if ccm1 != ccm2 or "ERROR" in ccm1:
-            self.bail(["Link errors detected via CCM counters:", ccm1, ccm2])
-        if self.he and (b2b1 != b2b2 or "ERROR" in b2b1):
-            self.bail(["Link errors detected via CCM counters:", b2b1, b2b2])
 
 
     def bail(self, lines=None):
