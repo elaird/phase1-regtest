@@ -101,6 +101,7 @@ def opts(full_rbx=False):
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10.stp",  # always fails bypass_test
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq_shift.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
@@ -126,6 +127,7 @@ def opts(full_rbx=False):
                       default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.2_20170928c.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_20181126a_fixed.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_DownReg_20181203c_fixed.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
@@ -134,6 +136,7 @@ def opts(full_rbx=False):
                       default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.2_20170928c.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_20181126a_fixed.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_DownReg_20181203c_fixed.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -150,6 +153,11 @@ def opts(full_rbx=False):
                       default=False,
                       action="store_true",
                       help="only do device info")
+    parser.add_option("--skip-device-info",
+                      dest="skipDeviceInfo",
+                      default=False,
+                      action="store_true",
+                      help="skip DEVICE_INFO")
     parser.add_option("--skip-verify",
                       dest="skipVerify",
                       default=False,
@@ -289,10 +297,11 @@ class programmer(driver.driver):
 
         self.check_stp(stp)
 
-        if self.target.endswith("pulser"):
-            self.action("DEVICE_INFO", stp, 30, key="FSN", check_jtag=False)
-        else:
-            self.action("DEVICE_INFO", stp, 30)
+        if not self.options.skipDeviceInfo:
+            if self.target.endswith("pulser"):
+                self.action("DEVICE_INFO", stp, 30, key="FSN", check_jtag=False)
+            else:
+                self.action("DEVICE_INFO", stp, 30)
 
         if not self.options.skipVerify:
             if self.target.endswith("pulser"):
