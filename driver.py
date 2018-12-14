@@ -45,11 +45,17 @@ class driver:
 
         minimal = not store
 
-        if self.fec1 != fec2:
+        if "ERROR" in self.fec1:
+            self.bail([""], minimal=minimal, note="fec_err")
+        elif "ERROR" in self.ccm1:
+            self.bail([""], minimal=minimal, note="ccm_err")
+        elif "ERROR" in self.b2b1:
+            self.bail([""], minimal=minimal, note="ccm_err")
+        elif self.fec1 != fec2:
             self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal=minimal, note="fec_ber")
-        if self.ccm1 != ccm2:
+        elif self.ccm1 != ccm2:
             self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal=minimal, note="ccm_ber")
-        if self.b2b1 != b2b2:
+        elif self.b2b1 != b2b2:
             lines = ["Link errors detected via CCM counters:", self.b2b1, b2b2]
             if store or (not self.target.endswith("neigh")):
                 self.bail(lines, minimal=minimal, note="b2b_ber")
@@ -102,7 +108,7 @@ class driver:
     def command(self, cmd):
         out = ngfec.command(self.server, cmd)[0]
         if "ERROR" in out:
-            print(out)
+            printer.red(out)
         return out
 
 
