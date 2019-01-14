@@ -18,7 +18,7 @@ class driver:
         pass
 
 
-    def errors(self, store=True):
+    def errors(self, store=True, letter=""):
         msg = "Reading link error counters"
         if store:
             msg += " (integrating for %d seconds)" % self.options.nSeconds
@@ -26,7 +26,7 @@ class driver:
         if hasattr(self, "target0"):
             target0 = self.target0
         else:
-            target0 = self.rbx
+            target0 = self.rbx + letter
 
         print(msg)
         fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % target0
