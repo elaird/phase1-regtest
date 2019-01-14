@@ -336,6 +336,20 @@ class commissioner(driver.driver):
                             ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
                             ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
                            ], device=fecs)
+
+                print self.command("put %s-test_comm 1" % (self.rbx + letter))
+                always = 0x8000
+                self.check([("fecccm_test_comm_cnt", always, None),
+                            ("fecccm_sys_master_cnt", None, None),  # FIXME
+                            ("fecccm_sys_refclk_cnt", always, None),
+                            ("fecccm_epcs_cdr_locked_cnt", always, None),
+                            ("fecccm_rx_pll_locked_cnt", always, None),
+                            ("fecccm_rx_header_locked_cnt", always, None),
+                            ("fecccm_rx_is_data", 1, None),
+                            ("fecccm_rx_ready_cnt", always, None),
+                            ("fecccm_rx_data_valid_cnt", always, None),
+                           ], device="%s%s" % (self.rbx, letter))
+
                 self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                             ("fec-sfp_tx_power_f", 550.0, 150.0),
                             ("fec_min_phase", None, None),
