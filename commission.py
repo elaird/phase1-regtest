@@ -164,7 +164,7 @@ class commissioner(driver.driver):
             self.guardians()
 
 
-        if (self.he or self.hf) and options.fec:
+        if options.fec:
             self.fec()
 
         if (self.he or self.hf) and options.ccm:
@@ -208,7 +208,7 @@ class commissioner(driver.driver):
             else:  # assume 904
                 self.sector = sector(self.rbx, True)
                 host = "hcal904daq04"
-                port = 64400
+                port = 64400 if self.sector else 64000
         elif self.he:
             if self.end in "MP":
                 host = "hcalngccm02"
@@ -234,14 +234,18 @@ class commissioner(driver.driver):
         # USC: http://cmsonline.cern.ch/cms-elog/1077160
         # 904: http://cmsonline.cern.ch/cms-elog/1077547
 
+        hbhe_full = (3, 1, 2, 0x14032018)
+        hbhe_half = (4, 2, 0xf, 0x12122018)
+        hbhe_expr = (4, 3, 3, 0x1052019)
+
         fecs = "unknown"
         sfp = 99
 
         if self.he:
-            fw = (4, 2, 0xd, 0x9182018)
+            fw = hbhe_half
             if self.end == "M":
                 if self.sector in [9, 29]:
-                    fw = (3, 1, 2, 0x14032018)
+                    fw = hbhe_full
                     fecs = "hefec7"
                     sfp = 7 if self.sector == 9 else 3
                 elif self.sector <= 12:
@@ -252,7 +256,7 @@ class commissioner(driver.driver):
                     sfp = self.sector - 11
             if self.end == "P":
                 if self.sector in [10, 30]:
-                    fw = (3, 1, 2, 0x14032018)
+                    fw = hbhe_full
                     fecs = "hefec7"
                     sfp = 6 if self.sector == 10 else 2
                 elif self.sector <= 6:
@@ -263,13 +267,17 @@ class commissioner(driver.driver):
                     sfp = self.sector - 6
 
             elif self.rbx == "HE0":
-                fw = (3, 1, 2, 0x14032018)
+                # fw = hbhe_full
+                fw = (3, 1, 2, 0x20102017)
+
                 fecs = "hefec1"
                 sfp = 2
             elif self.rbx == "HE25":
+                fw = hbhe_expr
                 fecs = "hefec5"
                 sfp = 1
             elif self.rbx == "HE25R":
+                fw = hbhe_expr
                 fecs = "hefec5"
                 sfp = 2
         elif self.hf:
@@ -292,6 +300,20 @@ class commissioner(driver.driver):
             if self.rbx == "ZDCP":
                 fecs = "hffec3"
                 sfp = 7
+        elif self.hb:
+            fw = hbhe_expr
+            if self.sector == 0:
+                fecs = "hefec1"
+                fw = hbhe_full
+            if 1 <= self.sector <= 6:
+                fecs = "hbfec1"
+                sfp = 2 * self.sector - 1
+            elif 7 <= self.sector <= 12:
+                fecs = "hbfec2"
+                sfp = 2 * (self.sector - 6) - 1
+            elif self.sector == 13:
+                fecs = "hbfec3"
+                sfp = self.sector - 12
 
         print self.command("get ccmserver_version")
 
@@ -309,39 +331,57 @@ class commissioner(driver.driver):
                     # qie_reset_early_cnt_rr
                     # qie_reset_late_cnt_rr
                     # qie_reset_ontime_cnt_rr
-                ], device=fecs)
+                   ], device=fecs)
 
-        self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
-                    ("fec-sfp_tx_power_f", 550.0, 150.0),
-                    ])
+        if self.hb:
+            for letter in "ab":
+                self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
+                            ("fec-sfp_tx_power_f", 550.0, 150.0),
+                            ("fec_min_phase", None, None),
+                            ("fec_max_phase", None, None),
+                           ], device="%s%s" % (self.rbx, letter))
+        else:
+            self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
+                        ("fec-sfp_tx_power_f", 550.0, 150.0),
+                       ])
 
 
     def ccm(self):
-        fw14 = 0x17092813
-        fw15 = 0x17092803
+        if self.he:
+            fw14 = 0x17092813
+            fw15 = 0x17092803
+            if self.sector == 0:
+                fw14 = 0x18082711
+                fw15 = 0x18082701
+            # if self.sector == 25:
+            #     fw14 = 0x18120333
+            #     fw15 = 0x18120323
+        elif self.hb:
+            fw14 = None
+            fw15 = None
+        else:
+            fw14 = None
+            fw15 = None
+
         current = 0.35e-3
         currentE = 0.15e-3
 
         if self.he:
             if self.options.j14:
                 lst = [("mezz_GEO_ADDR", 1, None),
-                       ("mezz_MASTER_J14_ENABLE", None, None),
-                       ("smezz_MASTER_J14_ENABLE", None, None),
                        ("mezz_FPGA_SILSIG", fw14, None),
                        ("smezz_FPGA_SILSIG", fw15, None),
-                       ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
+                       ("mezz_MASTER_J14_ENABLE_rr", None, None),
+                       ("smezz_MASTER_J14_ENABLE_rr", None, None),
                        ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
                 ]
             else:
                 lst = [("mezz_GEO_ADDR", 2, None),
-                       ("mezz_MASTER_J14_ENABLE", None, None),
-                       ("smezz_MASTER_J14_ENABLE", None, None),
-                       ("mezz_scratch", None, None),
-                       ("smezz_scratch", None, None),
                        ("mezz_FPGA_SILSIG", fw15, None),
                        ("smezz_FPGA_SILSIG", fw14, None),
+                       ("mezz_MASTER_J14_ENABLE_rr", None, None),
+                       ("smezz_MASTER_J14_ENABLE_rr", None, None),
                        ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
-                       ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
                 ]
 
             temp = 35.0
@@ -716,7 +756,7 @@ class commissioner(driver.driver):
                 self.bail(lines)
 
 
-    def bail(self, lines=None):
+    def bail(self, lines=None, minimal=False, note=""):
         if lines:
             printer.red("\n".join(lines))
         if not self.options.keepgoing:
