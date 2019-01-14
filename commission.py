@@ -234,7 +234,8 @@ class commissioner(driver.driver):
         # USC: http://cmsonline.cern.ch/cms-elog/1077160
         # 904: http://cmsonline.cern.ch/cms-elog/1077547
 
-        hbhe_full = (3, 1, 2, 0x14032018)
+        # hbhe_full = (3, 1, 2, 0x14032018)
+        hbhe_full = (3, 1, 2, 0x20102017)
         hbhe_half = (4, 2, 0xf, 0x12122018)
         hbhe_expr = (4, 3, 3, 0x1052019)
 
@@ -267,9 +268,7 @@ class commissioner(driver.driver):
                     sfp = self.sector - 6
 
             elif self.rbx == "HE0":
-                # fw = hbhe_full
-                fw = (3, 1, 2, 0x20102017)
-
+                fw = hbhe_full
                 fecs = "hefec1"
                 sfp = 2
             elif self.rbx == "HE25":
@@ -305,6 +304,7 @@ class commissioner(driver.driver):
             if self.sector == 0:
                 fecs = "hefec1"
                 fw = hbhe_full
+                sfp = 6
             if 1 <= self.sector <= 5:
                 fecs = "hbfec1"
                 sfp = 2 * self.sector - 1
@@ -350,25 +350,29 @@ class commissioner(driver.driver):
                            ], device=fecs)
                 self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                             ("fec-sfp_tx_power_f", 550.0, 150.0),
-                            ("fec_min_phase", None, None),
-                            ("fec_max_phase", None, None),
                            ], device="%s%s" % (self.rbx, letter))
+                old = not self.sector
+                if not old:
+                    self.check([("fec_min_phase", None, None),
+                                ("fec_max_phase", None, None),
+                            ], device="%s%s" % (self.rbx, letter))
 
-                self.errors(ccm=False, sleep=False, letter=letter)
-                print self.command("put %s-test_comm 1" % (self.rbx + letter))
-                always = 0x8000
-                self.check([("fecccm_test_comm_cnt", always, None),
-                            ("fecccm_sys_master_cnt", None, None),  # FIXME
-                            ("fecccm_sys_refclk_cnt", always, None),
-                            ("fecccm_epcs_cdr_locked_cnt", always, None),
-                            ("fecccm_rx_pll_locked_cnt", always, None),
-                            ("fecccm_rx_header_locked_cnt", always, None),
-                            ("fecccm_rx_is_data", 1, None),
-                            ("fecccm_rx_ready_cnt", always, None),
-                            ("fecccm_rx_data_valid_cnt", always, None),
-                           ], device="%s%s" % (self.rbx, letter))
+                self.errors(ccm=False, sleep=False, letter=letter, old=old)
+                if not old:
+                    print self.command("put %s-test_comm 1" % (self.rbx + letter))
+                    always = 0x8000
+                    self.check([("fecccm_test_comm_cnt", always, None),
+                                ("fecccm_sys_master_cnt", None, None),  # FIXME
+                                ("fecccm_sys_refclk_cnt", always, None),
+                                ("fecccm_epcs_cdr_locked_cnt", always, None),
+                                ("fecccm_rx_pll_locked_cnt", always, None),
+                                ("fecccm_rx_header_locked_cnt", always, None),
+                                ("fecccm_rx_is_data", 1, None),
+                                ("fecccm_rx_ready_cnt", always, None),
+                                ("fecccm_rx_data_valid_cnt", always, None),
+                               ], device="%s%s" % (self.rbx, letter))
 
-                self.errors(store=False, ccm=False, sleep=False, letter=letter)
+                self.errors(store=False, ccm=False, sleep=False, letter=letter, old=old)
         else:
             self.check([("sfp%d_status.TxFault_rr" % sfp, 0, None),
                         ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
@@ -377,6 +381,7 @@ class commissioner(driver.driver):
             self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                         ("fec-sfp_tx_power_f", 550.0, 150.0),
                        ])
+            self.errors(ccm=False, old=not self.sector)
 
 
     def ccm(self):
@@ -461,10 +466,14 @@ class commissioner(driver.driver):
                 print("| CCM%s |" % letter)
                 print("-" * 8)
                 self.check(lst, device="%s%s" % (self.rbx, letter))
-                self.errors(fec=False, letter=letter)
+                self.errors(fec=False, letter=letter, old=not self.sector)
         else:
+            print
+            print("-" * 7)
+            print("| CCM |")
+            print("-" * 7)
             self.check(lst)
-            self.errors()
+            self.errors(fec=False, old=not self.sector)
 
 
     def bv_scan(self):
