@@ -167,7 +167,7 @@ class commissioner(driver.driver):
         if options.fec:
             self.fec()
 
-        if (self.he or self.hf) and options.ccm:
+        if options.ccm:
             self.ccm()
 
         if self.he and (options.qiecards or options.qiecardsfull or options.bv):
@@ -322,9 +322,6 @@ class commissioner(driver.driver):
                     ("fec_ver_build_rr", fw[2], None),
                     ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
-                    ("sfp%d_status.TxFault_rr" % sfp, 0, None),
-                    ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
-                    ("sfp%d_gbt_rx_ready_rr" % sfp, 1, None),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
                     # qie_reset_cnt_rr
@@ -334,13 +331,21 @@ class commissioner(driver.driver):
                    ], device=fecs)
 
         if self.hb:
-            for letter in "ab":
+            for i, letter in enumerate("ab"):
+                self.check([("sfp%d_status.TxFault_rr" % (sfp + i), 0, None),
+                            ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
+                            ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
+                           ], device=fecs)
                 self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                             ("fec-sfp_tx_power_f", 550.0, 150.0),
                             ("fec_min_phase", None, None),
                             ("fec_max_phase", None, None),
                            ], device="%s%s" % (self.rbx, letter))
         else:
+            self.check([("sfp%d_status.TxFault_rr" % sfp, 0, None),
+                        ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
+                        ("sfp%d_gbt_rx_ready_rr" % sfp, 1, None),
+                       ], device=fecs)
             self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                         ("fec-sfp_tx_power_f", 550.0, 150.0),
                        ])
@@ -366,7 +371,24 @@ class commissioner(driver.driver):
         current = 0.35e-3
         currentE = 0.15e-3
 
-        if self.he:
+        if self.hb:
+            if self.options.j14:
+                lst = [("mezz_GEO_ADDR", 1, None),
+                       ("mezz_FPGA_SILSIG", fw14, None),
+                       ("smezz_FPGA_SILSIG", fw15, None),
+                       ("mezz_MASTER_B_ENABLE_rr", None, None),
+                       ("smezz_MASTER_B_ENABLE_rr", None, None),
+                       ("vtrx_rssi_bCntrl_f_rr", current, currentE),
+                ]
+            else:
+                lst = [("mezz_GEO_ADDR", 2, None),
+                       ("mezz_FPGA_SILSIG", fw15, None),
+                       ("smezz_FPGA_SILSIG", fw14, None),
+                       ("mezz_MASTER_B_ENABLE_rr", None, None),
+                       ("smezz_MASTER_B_ENABLE_rr", None, None),
+                       ("vtrx_rssi_aCntrl_f_rr", current, currentE),
+                ]
+        elif self.he:
             if self.options.j14:
                 lst = [("mezz_GEO_ADDR", 1, None),
                        ("mezz_FPGA_SILSIG", fw14, None),
@@ -404,7 +426,11 @@ class commissioner(driver.driver):
                    ("vtrx_rssi_f_rr", current, currentE),
                    ]
 
-        self.check(lst)
+        if self.hb:
+            for letter in "ab":
+                self.check(lst, device="%s%s" % (self.rbx, letter))
+        else:
+            self.check(lst)
         self.errors()
 
 
