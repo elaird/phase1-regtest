@@ -429,9 +429,10 @@ class commissioner(driver.driver):
         if self.hb:
             for letter in "ab":
                 self.check(lst, device="%s%s" % (self.rbx, letter))
+                self.errors(letter=letter)
         else:
             self.check(lst)
-        self.errors()
+            self.errors()
 
 
     def bv_scan(self):
