@@ -305,9 +305,12 @@ class commissioner(driver.driver):
             if self.sector == 0:
                 fecs = "hefec1"
                 fw = hbhe_full
-            if 1 <= self.sector <= 6:
+            if 1 <= self.sector <= 5:
                 fecs = "hbfec1"
                 sfp = 2 * self.sector - 1
+            elif self.sector == 6:
+                fecs = "hbfec4"
+                sfp = 3
             elif 7 <= self.sector <= 12:
                 fecs = "hbfec2"
                 sfp = 2 * (self.sector - 6) - 1
@@ -316,6 +319,11 @@ class commissioner(driver.driver):
                 sfp = self.sector - 12
 
         print self.command("get ccmserver_version")
+
+        print
+        print("-" * 7)
+        print("| FEC |")
+        print("-" * 7)
 
         self.check([("fec_ver_major_rr", fw[0], None),
                     ("fec_ver_minor_rr", fw[1], None),
@@ -332,11 +340,21 @@ class commissioner(driver.driver):
 
         if self.hb:
             for i, letter in enumerate("ab"):
+                print
+                print("-" * 14)
+                print("| FEC site %s |" % letter)
+                print("-" * 14)
                 self.check([("sfp%d_status.TxFault_rr" % (sfp + i), 0, None),
                             ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
                             ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
                            ], device=fecs)
+                self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
+                            ("fec-sfp_tx_power_f", 550.0, 150.0),
+                            ("fec_min_phase", None, None),
+                            ("fec_max_phase", None, None),
+                           ], device="%s%s" % (self.rbx, letter))
 
+                self.errors(ccm=False, sleep=False, letter=letter)
                 print self.command("put %s-test_comm 1" % (self.rbx + letter))
                 always = 0x8000
                 self.check([("fecccm_test_comm_cnt", always, None),
@@ -350,11 +368,7 @@ class commissioner(driver.driver):
                             ("fecccm_rx_data_valid_cnt", always, None),
                            ], device="%s%s" % (self.rbx, letter))
 
-                self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
-                            ("fec-sfp_tx_power_f", 550.0, 150.0),
-                            ("fec_min_phase", None, None),
-                            ("fec_max_phase", None, None),
-                           ], device="%s%s" % (self.rbx, letter))
+                self.errors(store=False, ccm=False, sleep=False, letter=letter)
         else:
             self.check([("sfp%d_status.TxFault_rr" % sfp, 0, None),
                         ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
@@ -442,8 +456,12 @@ class commissioner(driver.driver):
 
         if self.hb:
             for letter in "ab":
+                print
+                print("-" * 8)
+                print("| CCM%s |" % letter)
+                print("-" * 8)
                 self.check(lst, device="%s%s" % (self.rbx, letter))
-                self.errors(letter=letter)
+                self.errors(fec=False, letter=letter)
         else:
             self.check(lst)
             self.errors()
