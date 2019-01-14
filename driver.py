@@ -18,7 +18,7 @@ class driver:
         pass
 
 
-    def errors(self, store=True, letter="", fec=True, ccm=True, sleep=True):
+    def errors(self, store=True, letter="", fec=True, ccm=True, sleep=True, old=False):
         msg = "Reading link error counters ("
         if letter:
             msg += letter + ","
@@ -38,24 +38,27 @@ class driver:
             target0 = self.rbx + letter
 
         print(msg)
-        fec = "get %s-fec_[rx_rs_err,dv_down]_cnt_rr" % target0
-        ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % target0
-        b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
+        if old:
+            fec_cmd = "get %s-fec_dv_down_cnt_rr" % target0
+        else:
+            fec_cmd = "get %s-fec_[rx_rs_err,dv_down]_cnt_rr" % target0
+        ccm_cmd = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % target0
+        b2b_cmd = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
 
         if store:
             if fec:
-                self.fec1 = self.command(fec)
+                self.fec1 = self.command(fec_cmd)
             if ccm:
-                self.ccm1 = self.command(ccm)
-                self.b2b1 = self.command(b2b)
+                self.ccm1 = self.command(ccm_cmd)
+                self.b2b1 = self.command(b2b_cmd)
             if sleep:
                 time.sleep(self.options.nSeconds)
 
         if fec:
-            fec2 = self.command(fec)
+            fec2 = self.command(fec_cmd)
         if ccm:
-            ccm2 = self.command(ccm)
-            b2b2 = self.command(b2b)
+            ccm2 = self.command(ccm_cmd)
+            b2b2 = self.command(b2b_cmd)
 
         minimal = not store
 
