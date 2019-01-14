@@ -18,10 +18,19 @@ class driver:
         pass
 
 
-    def errors(self, store=True, letter=""):
-        msg = "Reading link error counters"
+    def errors(self, store=True, letter="", fec=True, ccm=True, sleep=True):
+        msg = "Reading link error counters ("
+        if letter:
+            msg += letter + ","
+        if fec:
+            msg += "fec,"
+        if ccm:
+            msg += "ccm,"
         if store:
-            msg += " (integrating for %d seconds)" % self.options.nSeconds
+            msg += "store,"
+            if sleep:
+                msg += "integrating for %d seconds" % self.options.nSeconds
+        msg += ")"
 
         if hasattr(self, "target0"):
             target0 = self.target0
@@ -29,33 +38,38 @@ class driver:
             target0 = self.rbx + letter
 
         print(msg)
-        fec = "get %s-fec_[rx_prbs_error,dv_down]_cnt_rr" % target0
+        fec = "get %s-fec_[rx_rs_err,dv_down]_cnt_rr" % target0
         ccm = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % target0
         b2b = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
 
         if store:
-            self.fec1 = self.command(fec)
-            self.ccm1 = self.command(ccm)
-            self.b2b1 = self.command(b2b)
-            time.sleep(self.options.nSeconds)
+            if fec:
+                self.fec1 = self.command(fec)
+            if ccm:
+                self.ccm1 = self.command(ccm)
+                self.b2b1 = self.command(b2b)
+            if sleep:
+                time.sleep(self.options.nSeconds)
 
-        fec2 = self.command(fec)
-        ccm2 = self.command(ccm)
-        b2b2 = self.command(b2b)
+        if fec:
+            fec2 = self.command(fec)
+        if ccm:
+            ccm2 = self.command(ccm)
+            b2b2 = self.command(b2b)
 
         minimal = not store
 
-        if "ERROR" in self.fec1:
+        if fec and "ERROR" in self.fec1:
             self.bail([""], minimal=minimal, note="fec_err")
-        elif "ERROR" in self.ccm1:
+        elif ccm and "ERROR" in self.ccm1:
             self.bail([""], minimal=minimal, note="ccm_err")
-        elif "ERROR" in self.b2b1:
+        elif ccm and "ERROR" in self.b2b1:
             self.bail([""], minimal=minimal, note="ccm_err")
-        elif self.fec1 != fec2:
+        elif fec and self.fec1 != fec2:
             self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal=minimal, note="fec_ber")
-        elif self.ccm1 != ccm2:
+        elif ccm and self.ccm1 != ccm2:
             self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal=minimal, note="ccm_ber")
-        elif self.b2b1 != b2b2:
+        elif ccm and self.b2b1 != b2b2:
             lines = ["Link errors detected via CCM counters:", self.b2b1, b2b2]
             if store or (not self.target.endswith("neigh")):
                 self.bail(lines, minimal=minimal, note="b2b_ber")
