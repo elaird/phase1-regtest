@@ -170,8 +170,12 @@ class commissioner(driver.driver):
         if options.ccm:
             self.ccm()
 
-        if self.he and (options.qiecards or options.qiecardsfull or options.bv):
-            self.check([("bkp_pwr_bad_rr", 0, None)])
+        if (self.hb or self.he) and (options.qiecards or options.qiecardsfull or options.bv):
+            if self.hb:
+                for letter in "ab":
+                    self.check([("bkp_pwr_bad_rr", 0, None)], device="%s%s" % (self.rbx, letter))
+            else:
+                self.check([("bkp_pwr_bad_rr", 0, None)])
 
         if options.qiecards:
             if self.he:
@@ -188,7 +192,7 @@ class commissioner(driver.driver):
         if self.he and (options.get_delays or options.set_delays):
             self.set_delays(put=options.set_delays)
 
-        if self.he and options.bv:
+        if (self.hb or self.he) and options.bv:
             self.bv()
 
         if options.uhtr:
@@ -407,16 +411,16 @@ class commissioner(driver.driver):
         if self.hb:
             if self.options.j14:
                 lst = [("mezz_GEO_ADDR", 1, None),
-                       ("mezz_FPGA_SILSIG", fw14, None),
-                       ("smezz_FPGA_SILSIG", fw15, None),
+                       ("mezz_FPGA_SILSIG_rr", fw14, None),
+                       ("smezz_FPGA_SILSIG_rr", fw15, None),
                        ("mezz_MASTER_B_ENABLE_rr", None, None),
                        ("smezz_MASTER_B_ENABLE_rr", None, None),
                        ("vtrx_rssi_bCntrl_f_rr", current, currentE),
                 ]
             else:
                 lst = [("mezz_GEO_ADDR", 2, None),
-                       ("mezz_FPGA_SILSIG", fw15, None),
-                       ("smezz_FPGA_SILSIG", fw14, None),
+                       ("mezz_FPGA_SILSIG_rr", fw15, None),
+                       ("smezz_FPGA_SILSIG_rr", fw14, None),
                        ("mezz_MASTER_B_ENABLE_rr", None, None),
                        ("smezz_MASTER_B_ENABLE_rr", None, None),
                        ("vtrx_rssi_aCntrl_f_rr", current, currentE),
@@ -487,18 +491,24 @@ class commissioner(driver.driver):
 
     def bv(self):
         for iRm in range(1, 5):
-            print self.command("get %s-%d-PeltierVoltage_f_rr" % (self.rbx, iRm))
-            print self.command("get %s-%d-PeltierCurrent_f_rr" % (self.rbx, iRm))
-            if not self.options.set_bv:
-                print self.command("get %s-%d-biasmon[1-48]_f_rr" % (self.rbx, iRm))
-
-            items = [("%d-BVin_f_rr" % iRm, 100.0, 4.0),
-                     ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.5, 6.5),
-                     ("%d-rtdtemperature_f" % iRm, 18.0, 2.0),
-                     ("%d-temperature_f" % iRm, 18.0, 2.0),
-                     ("%d-humidityS_f_rr" % iRm, 10.0, 10.0),
-                 ]
+            items = [("%d-PeltierVoltage_f_rr" % iRm, 3.0, 2.5),
+                     ("%d-PeltierCurrent_f_rr" % iRm, 0.9, 0.75),
+                     ("%d-BVin_f_rr" % iRm, 100.0, 4.0),
+                     ("%d-rtdtemperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
+                     # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
+                    ]
             self.check(items)
+            self.check([("%d-humidityS_f_rr" % iRm, 10.0, 10.0)], timeout=15)
+
+            if not self.options.set_bv:
+                if self.he:
+                    self.check([("%d-biasmon[1-48]_f_rr" % iRm, 67.0, 3.0),
+                                ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.5, 9.5),
+                               ])
+                else:
+                    self.check([("%d-biasmon[1-64]_f_rr" % iRm, 67.0, 3.0),
+                                ("%d-LeakageCurrent[1-64]_f_rr" % iRm, 13.5, 9.5),
+                               ])
 
         if self.options.set_bv:
             for value in [0.0, 67.0]:
@@ -763,12 +773,12 @@ class commissioner(driver.driver):
         return iStart, iEnd, items
 
 
-    def check(self, items, device=None):
+    def check(self, items, device=None, timeout=5):
         for item, expected, threshold in items:
             if device is None:
-                res = self.command("get %s-%s" % (self.rbx, item))
+                res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout)
             else:
-                res = self.command("get %s-%s" % (device, item))
+                res = self.command("get %s-%s" % (device, item), timeout=timeout)
             if expected is not None:
                 if threshold is None:
                     self.compare(res, expected)
@@ -816,9 +826,9 @@ class commissioner(driver.driver):
             results = []
             self.bail([str(res), "Could not convert all of these to floats:\n%s" % str(res1)])
 
-        for result in results:
+        for iResult, result in enumerate(results):
             if threshold < abs(result - expected):
-                lines = ["Expected %s +- %s: " % (str(expected), str(threshold)), str(res)]
+                lines = ["Expected %s +- %s (i=%d): " % (str(expected), str(threshold), 1 + iResult), str(res)]
                 if msg:
                     lines.insert(0, msg)
                 self.bail(lines)
