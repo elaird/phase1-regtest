@@ -491,6 +491,11 @@ class commissioner(driver.driver):
 
     def bv(self):
         for iRm in range(1, 5):
+            print
+            print("-" * 25)
+            print("| BV and Peltier (RM %d) |" % iRm)
+            print("-" * 25)
+
             items = [("%d-PeltierVoltage_f_rr" % iRm, 3.0, 2.5),
                      ("%d-PeltierCurrent_f_rr" % iRm, 0.9, 0.75),
                      ("%d-BVin_f_rr" % iRm, 100.0, 4.0),
@@ -779,19 +784,18 @@ class commissioner(driver.driver):
                 res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout)
             else:
                 res = self.command("get %s-%s" % (device, item), timeout=timeout)
-            if expected is not None:
+            if expected is None:
+                print res
+            else:
                 if threshold is None:
                     self.compare(res, expected)
                 else:
                     self.compare_with_threshold(res, expected, threshold)
-            print res
 
 
-    def compare(self, res, expected, strip=True, msg=""):
-        if strip:
-            res1 = res.split("#")[1].strip()
-        else:
-            res1 = res
+    def compare(self, res, expected, msg=""):
+        res0 = res.split("#")[0]
+        res1 = res.split("#")[1].strip()
 
         try:
             result = int(res1, 16 if res1.startswith("0x") else 10)
@@ -800,17 +804,17 @@ class commissioner(driver.driver):
             self.bail([res, "Could not convert '%s' to an integer." % res1])
 
         if result != expected and expected is not None:
-            lines = ["Expected %s: " % str(expected), res]
-            if msg:
-                lines.insert(0, msg)
-            self.bail(lines)
-
-
-    def compare_with_threshold(self, res, expected, threshold, strip=True, msg=""):
-        if strip:
-            res1 = res.split("#")[1].strip()
+            print("%s# %s   %s" % (res0,
+                                   printer.red(res1, p=False),
+                                   printer.purple("(expected %s)" % str(expected), p=False)))
+            self.bail([msg] if msg else [])
         else:
-            res1 = res
+            print res
+
+
+    def compare_with_threshold(self, res, expected, threshold, msg=""):
+        res0 = res.split("#")[0]
+        res1 = res.split("#")[1].strip()
 
         if " " in res1:
             res1 = res1.split()
@@ -826,12 +830,19 @@ class commissioner(driver.driver):
             results = []
             self.bail([str(res), "Could not convert all of these to floats:\n%s" % str(res1)])
 
+        fail = []
         for iResult, result in enumerate(results):
             if threshold < abs(result - expected):
-                lines = ["Expected %s +- %s (i=%d): " % (str(expected), str(threshold), 1 + iResult), str(res)]
-                if msg:
-                    lines.insert(0, msg)
-                self.bail(lines)
+                fail.append(iResult)
+                res1[iResult] = printer.red(res1[iResult], p=False)
+
+        if fail:
+            print("%s# %s   %s" % (res0,
+                                   " ".join(res1),
+                                   printer.purple("(expected %s +- %s)" % (str(expected), str(threshold)), p=False)))
+            self.bail([msg] if msg else [])
+        else:
+            print res
 
 
     def bail(self, lines=None, minimal=False, note=""):
@@ -844,9 +855,3 @@ class commissioner(driver.driver):
 
 if __name__ == "__main__":
     p = commissioner(*opts())
-
-    ###############################
-    # still to be added
-    # FEC link status
-    # CU data links
-    ###############################
