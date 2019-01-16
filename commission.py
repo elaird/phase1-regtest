@@ -785,7 +785,8 @@ class commissioner(driver.driver):
             else:
                 res = self.command("get %s-%s" % (device, item), timeout=timeout)
             if expected is None:
-                print res
+                if "ERROR" not in res:
+                    print res
             else:
                 if threshold is None:
                     self.compare(res, expected)
@@ -794,18 +795,21 @@ class commissioner(driver.driver):
 
 
     def compare(self, res, expected, msg=""):
-        res0 = res.split("#")[0]
-        res1 = res.split("#")[1].strip()
+        fields = res.split("#")
 
         try:
-            result = int(res1, 16 if res1.startswith("0x") else 10)
+            result = int(fields[1], 16 if fields[1].startswith("0x") else 10)
         except ValueError:
             result = None
-            self.bail([res, "Could not convert '%s' to an integer." % res1])
+            if "ERROR" not in res:
+                fields[1] = printer.red(fields[1], p=False)
+                print("#".join(fields))
+            self.bail()
 
         if result != expected and expected is not None:
-            print("%s# %s   %s" % (res0,
-                                   printer.red(res1, p=False),
+            if "ERROR" not in res:
+                fields[1] = printer.red(fields[1], p=False)
+                print("%s   %s" % ("#".join(fields),
                                    printer.purple("(expected %s)" % str(expected), p=False)))
             self.bail([msg] if msg else [])
         else:
@@ -813,13 +817,12 @@ class commissioner(driver.driver):
 
 
     def compare_with_threshold(self, res, expected, threshold, msg=""):
-        res0 = res.split("#")[0]
-        res1 = res.split("#")[1].strip()
+        fields = res.split("#")
 
-        if " " in res1:
-            res1 = res1.split()
-        elif type(res1) is not list:
-            res1 = [res1]
+        if " " in fields[1]:
+            res1 = fields[1].split()
+        elif type(fields[1]) is not list:
+            res1 = [fields[1]]
 
         try:
             if res1[0].startswith("0x"):
@@ -828,7 +831,10 @@ class commissioner(driver.driver):
                 results = [float(x) for x in res1]
         except ValueError:
             results = []
-            self.bail([str(res), "Could not convert all of these to floats:\n%s" % str(res1)])
+            if "ERROR" not in res:
+                fields[1] = printer.red(fields[1], p=False)
+                print("#".join(fields))
+            self.bail()
 
         fail = []
         for iResult, result in enumerate(results):
@@ -837,12 +843,13 @@ class commissioner(driver.driver):
                 res1[iResult] = printer.red(res1[iResult], p=False)
 
         if fail:
-            print("%s# %s   %s" % (res0,
+            print("%s# %s   %s" % (fields[0],
                                    " ".join(res1),
                                    printer.purple("(expected %s +- %s)" % (str(expected), str(threshold)), p=False)))
             self.bail([msg] if msg else [])
         else:
-            print res
+            if "ERROR" not in res:
+                print res
 
 
     def bail(self, lines=None, minimal=False, note=""):
