@@ -798,7 +798,7 @@ class commissioner(driver.driver):
         fields = res.split("#")
 
         try:
-            result = int(fields[1], 16 if fields[1].startswith("0x") else 10)
+            result = int(fields[1], 16 if fields[1].strip().startswith("0x") else 10)
         except ValueError:
             result = None
             if "ERROR" not in res:
@@ -825,7 +825,7 @@ class commissioner(driver.driver):
             res1 = [fields[1]]
 
         try:
-            if res1[0].startswith("0x"):
+            if res1[0].strip().startswith("0x"):
                 results = [int(x, 16) for x in res1]
             else:
                 results = [float(x) for x in res1]
