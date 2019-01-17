@@ -408,56 +408,50 @@ class commissioner(driver.driver):
         current = 0.35e-3
         currentE = 0.15e-3
 
-        if self.hb:
-            if self.options.j14:
-                lst = [("mezz_GEO_ADDR", 1, None),
-                       ("mezz_FPGA_SILSIG_rr", fw14, None),
-                       ("smezz_FPGA_SILSIG_rr", fw15, None),
-                       ("mezz_MASTER_B_ENABLE_rr", None, None),
-                       ("smezz_MASTER_B_ENABLE_rr", None, None),
-                       ("vtrx_rssi_bCntrl_f_rr", current, currentE),
-                ]
-            else:
-                lst = [("mezz_GEO_ADDR", 2, None),
-                       ("mezz_FPGA_SILSIG_rr", fw15, None),
-                       ("smezz_FPGA_SILSIG_rr", fw14, None),
-                       ("mezz_MASTER_B_ENABLE_rr", None, None),
-                       ("smezz_MASTER_B_ENABLE_rr", None, None),
-                       ("vtrx_rssi_aCntrl_f_rr", current, currentE),
-                ]
-        elif self.he:
-            if self.options.j14:
-                lst = [("mezz_GEO_ADDR", 1, None),
-                       ("mezz_FPGA_SILSIG", fw14, None),
-                       ("smezz_FPGA_SILSIG", fw15, None),
-                       ("mezz_MASTER_J14_ENABLE_rr", None, None),
-                       ("smezz_MASTER_J14_ENABLE_rr", None, None),
-                       ("vtrx_rssi_J14_Cntrl_f_rr", current, currentE),
-                ]
-            else:
-                lst = [("mezz_GEO_ADDR", 2, None),
-                       ("mezz_FPGA_SILSIG", fw15, None),
-                       ("smezz_FPGA_SILSIG", fw14, None),
-                       ("mezz_MASTER_J14_ENABLE_rr", None, None),
-                       ("smezz_MASTER_J14_ENABLE_rr", None, None),
-                       ("vtrx_rssi_J15_Cntrl_f_rr", current, currentE),
-                ]
+        if self.options.j14:
+            lst = [("mezz_GEO_ADDR", 1, None),
+                   ("mezz_FPGA_SILSIG_rr", fw14, None),
+                   ("smezz_FPGA_SILSIG_rr", fw15, None)]
+        else:
+            lst = [("mezz_GEO_ADDR", 2, None),
+                   ("mezz_FPGA_SILSIG_rr", fw15, None),
+                   ("smezz_FPGA_SILSIG_rr", fw14, None)]
 
-            temp = 35.0
-            tempE = 5.0
-            lst += [# ("temp_J13_Clk_U10_f_rr", temp, tempE),
-                    # ("temp_J13_Clk_U11_f_rr", temp, tempE),
-                    # ("temp_J14_Ctrl_U18_f_rr", temp, tempE),
-                    # ("temp_J14_Ctrl_U19_f_rr", temp, tempE),
-                    # ("temp_J15_Ctrl_U18_f_rr", temp, tempE),
-                    # ("temp_J15_Ctrl_U19_f_rr", temp, tempE),
-                    # ("temp_J16_Clk_U10_f_rr", temp, tempE),
-                    # ("temp_J16_Clk_U11_f_rr", temp, tempE),
-                    # ("J13_Clk_1w_f", None, None),
-                    # ("J14_Cntrl_1w_f", None, None),
-                    # ("J15_Cntrl_1w_f", None, None),
-                    # ("J16_Clk_1w_f", None, None),
-                ]
+        if self.hb:
+            lst += [("mezz_MASTER_B_ENABLE_rr", None, None),
+                    ("smezz_MASTER_B_ENABLE_rr", None, None)]
+        elif self.he:
+            lst += [("mezz_MASTER_J14_ENABLE_rr", None, None),
+                    ("smezz_MASTER_J14_ENABLE_rr", None, None)]
+
+        lst += [("mezz_PELTIER_DISABLE_CNTR", 5, 5),
+                ("b2b_PELTIER_DISABLE_CNTR", 5, 5),
+                ("mezz_PWR_ENABLE_CNTR", 5, 5),
+                ("b2b_PWR_ENABLE_CNTR", 5, 5)]
+
+        if self.hb:
+            prefix = "b" if self.options.j14 else "a"
+        elif self.he:
+            prefix = "J14_" if self.options.j14 else "J15_"
+
+        lst.append(("vtrx_rssi_%sCntrl_f_rr" % prefix, current, currentE))
+
+        # temp = 35.0
+        # tempE = 5.0
+        # lst += [("temp_J13_Clk_U10_f_rr", temp, tempE),
+        #         ("temp_J13_Clk_U11_f_rr", temp, tempE),
+        #         ("temp_J14_Ctrl_U18_f_rr", temp, tempE),
+        #         ("temp_J14_Ctrl_U19_f_rr", temp, tempE),
+        #         ("temp_J15_Ctrl_U18_f_rr", temp, tempE),
+        #         ("temp_J15_Ctrl_U19_f_rr", temp, tempE),
+        #         ("temp_J16_Clk_U10_f_rr", temp, tempE),
+        #         ("temp_J16_Clk_U11_f_rr", temp, tempE),
+        #         ("J13_Clk_1w_f", None, None),
+        #         ("J14_Cntrl_1w_f", None, None),
+        #         ("J15_Cntrl_1w_f", None, None),
+        #         ("J16_Clk_1w_f", None, None),
+        #        ]
+
         if self.hf:
             lst = [("mezz_FPGA_SILSIG", 0x16120501, None),
                    ("vtrx_rssi_f_rr", current, currentE),
