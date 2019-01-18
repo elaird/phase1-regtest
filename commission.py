@@ -492,7 +492,6 @@ class commissioner(driver.driver):
 
             items = [("%d-PeltierVoltage_f_rr" % iRm, 3.0, 2.5),
                      ("%d-PeltierCurrent_f_rr" % iRm, 0.9, 0.75),
-                     ("%d-BVin_f_rr" % iRm, 100.0, 4.0),
                      ("%d-rtdtemperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                      # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                     ]
@@ -500,14 +499,11 @@ class commissioner(driver.driver):
             self.check([("%d-humidityS_f_rr" % iRm, 10.0, 11.0)], timeout=15)
 
             if not self.options.set_bv:
-                if self.he:
-                    self.check([("%d-biasmon[1-48]_f_rr" % iRm, 67.0, 3.0),
-                                ("%d-LeakageCurrent[1-48]_f_rr" % iRm, 13.5, 9.5),
-                               ])
-                else:
-                    self.check([("%d-biasmon[1-64]_f_rr" % iRm, 67.0, 3.0),
-                                ("%d-LeakageCurrent[1-64]_f_rr" % iRm, 13.5, 9.5),
-                               ])
+                nCh = 48 if self.he else 64
+                self.check([("%d-BVin_f_rr" % iRm, 100.0, 4.0),
+                            ("%d-biasmon[1-%d]_f_rr" % (iRm, nCh), 67.0, 3.0),
+                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 13.5, 9.5),
+                           ])
 
         if self.options.set_bv:
             for value in [0.0, 67.0]:
