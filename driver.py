@@ -129,7 +129,7 @@ class driver:
         self.logfile.close()
 
 
-    def command(self, cmd, timeout=5, bail_on_timeout=False):
+    def command(self, cmd, timeout=5, bail_on_timeout=False, only_first_line=True):
         fields = cmd.split()
         if not fields:
             return None
@@ -146,10 +146,10 @@ class driver:
         try:
             self.server.sendline(cmd)
             self.server.expect(regexp, timeout=timeout)
-            out = self.server.match.group(0).split("\r\n")[0]
+            out = self.server.match.group(0).split("\r\n")
         except pexpect.TIMEOUT:
             if not bail_on_timeout:
-                out = cmd + " # ERROR: timed out after %d seconds" % timeout
+                out = [cmd + " # ERROR: timed out after %d seconds" % timeout]
             else:
                 lines = [printer.msg('The command "', p=False),
                          printer.cyan(cmd, p=False),
@@ -158,9 +158,9 @@ class driver:
                          printer.error(msg)]
                 self.bail(lines, tail=True)
 
-        if "ERROR" in out:
-            printer.red(out)
-        return out
+        if "ERROR" in out[0]:
+            printer.red(out[0])
+        return out[0] if only_first_line else out
 
 
 def fake_options():
