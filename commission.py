@@ -497,7 +497,7 @@ class commissioner(driver.driver):
                      # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                     ]
             self.check(items)
-            self.check([("%d-humidityS_f_rr" % iRm, 10.0, 10.0)], timeout=15)
+            self.check([("%d-humidityS_f_rr" % iRm, 10.0, 11.0)], timeout=15)
 
             if not self.options.set_bv:
                 if self.he:
@@ -775,9 +775,9 @@ class commissioner(driver.driver):
     def check(self, items, device=None, timeout=5):
         for item, expected, threshold in items:
             if device is None:
-                res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout)
+                res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout, dontexit=True)
             else:
-                res = self.command("get %s-%s" % (device, item), timeout=timeout)
+                res = self.command("get %s-%s" % (device, item), timeout=timeout, dontexit=True)
             if expected is None:
                 if "ERROR" not in res:
                     print res
