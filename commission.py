@@ -178,8 +178,8 @@ class commissioner(driver.driver):
                 self.check([("bkp_pwr_bad_rr", 0, None)])
 
         if options.qiecards:
-            if self.he:
-                self.qiecards_he()
+            if self.hb or self.he:
+                self.qiecards_hbhe()
             if self.hf:
                 self.qiecards_hf()
 
@@ -534,7 +534,9 @@ class commissioner(driver.driver):
         self.check(items)
 
 
-    def qiecards_he(self, full=False):
+    def qiecards_hbhe(self, full=False):
+        nCh = 64 if self.hb else 48
+
         items = []
         for iRm in range(1, 6):
             for iQieCard in range(1, 5):
@@ -542,40 +544,42 @@ class commissioner(driver.driver):
                     if iQieCard == 1:
                         stem = "calib"
                         stemQ = stem
-                        qie = "QIE[1-12]"
+                        qie = "QIE[1-%s]" % (nCh / 4)
                     else:
                         continue
                 else:
                     stem = "%d-%d" % (iRm, iQieCard)
                     stemQ = "%d" % iRm
-                    qie = "QIE[1-48]"
+                    qie = "QIE[1-%d]" % nCh
 
-                items.append(("%s-i_FPGA_MAJOR_VERSION_rr" % stem, 3, None))
-                items.append(("%s-i_FPGA_MINOR_VERSION_rr" % stem, 9, None))
-                if full:
-                    items.append(("%s-i_scratch_rr" % stem, None, None))
-                    items.append(("%s-i_WTE_count_rr" % stem, None, None))
-                    items.append(("%s-i_Clk_count_rr" % stem, None, None))
-                    items.append(("%s-i_bc0_status_count_a_rr" % stem, None, None))
+                for igloo in ["iBot", "iTop"] if self.hb else ["i"]:
+                    items.append(("%s-%s_FPGA_MAJOR_VERSION_rr" % (stem, igloo), 1 if self.hb else 3, None))
+                    items.append(("%s-%s_FPGA_MINOR_VERSION_rr" % (stem, igloo), 3 if self.hb else 9, None))
+                    if full:
+                        items.append(("%s-%s_scratch_rr"   % (stem, igloo), None, None))
+                        items.append(("%s-%s_WTE_count_rr" % (stem, igloo), None, None))
+                        items.append(("%s-%s_Clk_count_rr" % (stem, igloo), None, None))
+                        items.append(("%s-%s_bc0_status_count_a_rr" % (stem, igloo), None, None))
 
-                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
-                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
-                if full:
-                    items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
-                    items.append(("%s-B_bc0_status_count" % stem, None, None))
-                    # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
-                    items.append(("%s-B_SCRATCH_rr" % stem, None, None))
-                    items.append(("%s-B_SHT_temp_f_rr" % stem, 27.0, 7.0))
-                    items.append(("%s-UniqueID_rr" % stem, None, None))
-                    #items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
+                    items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
+                    items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
+                    if full:
+                        items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
+                        items.append(("%s-B_bc0_status_count" % stem, None, None))
+                        # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
+                        items.append(("%s-B_SCRATCH_rr" % stem, None, None))
+                        items.append(("%s-B_SHT_temp_f_rr" % stem, 27.0, 7.0))
+                        items.append(("%s-UniqueID_rr" % stem, None, None))
+                        #items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
 
-            # items.append(("%s-%s_Gsel_rr" % (stemQ, qie), None, None))
-            # items.append(("%s-%s_PedestalDAC_rr" % (stemQ, qie), None, None))
-            # items.append(("%s-%s_CapID0pedestal_rr" % (stemQ, qie), None, None))
-            # items.append(("%s-%s_CapID1pedestal_rr" % (stemQ, qie), None, None))
-            # items.append(("%s-%s_CapID2pedestal_rr" % (stemQ, qie), None, None))
-            # items.append(("%s-%s_CapID3pedestal_rr" % (stemQ, qie), None, None))
-        items.append(("pulser-fpga", 6, None))
+                # items.append(("%s-%s_Gsel" % (stemQ, qie), None, None))
+                # items.append(("%s-%s_PedestalDAC" % (stemQ, qie), None, None))
+                # items.append(("%s-%s_CapID0pedestal" % (stemQ, qie), None, None))
+                # items.append(("%s-%s_CapID1pedestal" % (stemQ, qie), None, None))
+                # items.append(("%s-%s_CapID2pedestal" % (stemQ, qie), None, None))
+                # items.append(("%s-%s_CapID3pedestal" % (stemQ, qie), None, None))
+
+        items.append(("pulser-fpga", 7, None))
         self.check(items)
 
 
