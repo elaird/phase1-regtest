@@ -27,7 +27,7 @@ def kill_clients():
     os.system("killall ngccm >& /dev/null")
 
 
-def command(p, cmd, timeout=5):
+def command(p, cmd, timeout=5, dontexit=False):
     fields = cmd.split()
     if not fields:
         return None
@@ -48,10 +48,13 @@ def command(p, cmd, timeout=5):
     except pexpect.TIMEOUT:
         tail = "tail -20 %s" % p.logfile.name
 
-        msg  = printer.msg('The command "', p=False)
-        msg += printer.cyan(cmd, p=False)
-        msg += printer.msg('"\n       produced unexpected output.  Consult the log file, e.g.', p=False)
-        msg += printer.msg('\n       "%s" gives this:' % printer.gray(tail, p=False), p=False)
-        printer.error(msg)
-        os.system(tail)
-        sys.exit()
+        if dontexit:
+            return [cmd + " # ERROR: timed out after %d seconds" % timeout]
+        else:
+            msg  = printer.msg('The command "', p=False)
+            msg += printer.cyan(cmd, p=False)
+            msg += printer.msg('"\n       produced unexpected output.  Consult the log file, e.g.', p=False)
+            msg += printer.msg('\n       "%s" gives this:' % printer.gray(tail, p=False), p=False)
+            printer.error(msg)
+            os.system(tail)
+            sys.exit()
