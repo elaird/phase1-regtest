@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import driver, ngfec, printer
+import driver, printer
 from powerMon import commandOutputFull
 import datetime, optparse, os, sys, time
 
@@ -771,9 +771,9 @@ class commissioner(driver.driver):
     def check(self, items, device=None, timeout=5):
         for item, expected, threshold in items:
             if device is None:
-                res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout, dontexit=True)
+                res = self.command("get %s-%s" % (self.rbx, item), timeout=timeout)
             else:
-                res = self.command("get %s-%s" % (device, item), timeout=timeout, dontexit=True)
+                res = self.command("get %s-%s" % (device, item), timeout=timeout)
             if expected is None:
                 if "ERROR" not in res:
                     print res
