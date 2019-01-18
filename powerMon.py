@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import ngfec
+import driver
 import datetime, optparse, os, subprocess, sys, time
 
 
@@ -40,42 +40,40 @@ def opts():
                       dest="noUhtr",
                       default=False,
                       action="store_true")
-    return parser.parse_args()
+    return parser.parse_args()[0]
 
 
-def main(options, _):
-    ngfec.kill_clients()
-
-    # ccmLogfile = open(options.logfile + ".ccm", "a")
-    # ccmLogfile.write("\n" + str(datetime.datetime.today()))
-
-    logfile = open(options.logfile, "a")
-    logfile.write("\n" + str(datetime.datetime.today()))
-
-    server = ngfec.connect(options.host, options.port) #, ccmLogfile)
-    work(server, logfile, options.rbxes.split(","), not options.noUhtr)
-    ngfec.disconnect(server)
-
-    # ccmLogfile.close()
-    logfile.write("\n")
-    logfile.close()
+class powermon(driver.driver):
+    def __init__(self, options):
+        self.options = options
+        self.connect()
+        self.work()
+        self.bail(minimal=True)
 
 
-def work(server, logfile, rbxes, uhtr):
-    for rbx in rbxes:
-        for card in ["J14", "J15"]:
-            for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current", "2V5_voltage", "VIN_voltage"]:
-                logfile.write("\n" + ngfec.command(server, "get %s-%s_%s_Cntrl_f_rr" % (rbx, var, card))[0])
+    def work(self):
+        for rbx in self.options.rbxes.split(","):
+            for card in ["J14", "J15"]:
+                for var in ["vtrx_rssi", "3V3_bkp", "1V2_voltage", "1V2_current", "2V5_voltage", "VIN_voltage"]:
+                    self.command("get %s-%s_%s_Cntrl_f_rr" % (rbx, var, card))
 
-        logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_tx_power_f" % rbx)[0])
-        logfile.write("\n" + ngfec.command(server, "get %s-fec-sfp_rx_power_f" % rbx)[0])
+            self.command("get %s-fec-sfp_tx_power_f" % rbx)
+            self.command("get %s-fec-sfp_rx_power_f" % rbx)
 
-    if uhtr:
-        for iPod in range(2):
-            uhtr_powers = commandOutput("uHTRtool.exe -c 63:7 -s linkStatus.uhtr | grep PPOD%d -A 1 | tail -1" % iPod)
-            s = " ".join(uhtr_powers).replace(" (uW)", "%d #" % iPod)
-            logfile.write("\nget " + s)
+        if not self.options.noUhtr:
+            for iPod in range(2):
+                uhtr_powers = commandOutput("uHTRtool.exe -c 63:7 -s linkStatus.uhtr | grep PPOD%d -A 1 | tail -1" % iPod)
+                s = " ".join(uhtr_powers).replace(" (uW)", "%d #" % iPod)
+                self.logfile.write("\nget " + s)
+
+
+def main():
+    try:
+        powermon(opts())
+    except RuntimeError as e:
+        printer.red(e[1])
+        sys.exit(" ")
 
 
 if __name__ == "__main__":
-    main(*opts())
+    main()
