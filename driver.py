@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
-import ngfec, printer
-import collections, datetime, sys, time
+import printer
+import collections, datetime, os, pexpect, re, sys, time
 
 
 class driver:
@@ -11,7 +11,8 @@ class driver:
         self.target = target
 
         self.connect()
-        self.bail()
+        self.command("get ccmserver_version")
+        self.bail(minimal=True)
 
 
     def enable(self):
@@ -89,9 +90,11 @@ class driver:
             self.command("tput %s-lg push" % self.rbx)
 
 
-    def bail(self, lines=[], minimal=False, note="unspecified"):
+    def bail(self, lines=[], minimal=False, note="unspecified", tail=False):
         if lines:
             printer.purple("Exiting due to \"%s\"" % note)
+        if tail:
+            os.system("tail -20 %s" % self.logfile)
 
         if not minimal:
             self.enable()
@@ -112,18 +115,49 @@ class driver:
         self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
         self.logfile.write(h)
 
-        # ngfec.survey_clients()
-        ngfec.kill_clients()
-        self.server = ngfec.connect(self.options.host, self.options.port, self.logfile)
+        os.system("killall ngccm >& /dev/null")
+        self.server = pexpect.spawn("ngFEC.exe -z -c -t -p %d -H %s" % (self.options.port, self.options.host))
+        self.server.logfile = self.logfile
+        self.server.sendline("")
+        self.server.expect(".*")
 
 
     def disconnect(self):
-        ngfec.disconnect(self.server)
+        self.server.sendline("quit")
+        self.server.expect(pexpect.EOF)
+        self.server.close()
         self.logfile.close()
 
 
-    def command(self, cmd, timeout=5, dontexit=False):
-        out = ngfec.command(self.server, cmd, timeout=timeout, dontexit=dontexit)[0]
+    def command(self, cmd, timeout=5, bail_on_timeout=False):
+        fields = cmd.split()
+        if not fields:
+            return None
+
+        if fields[0] == "jtag":
+            if len(fields) < 4:
+                print("COMMAND has to few fields: (%s)" % cmd)
+                return None
+
+            regexp = "(.*)%s %s %s# retcode=(.*)" % tuple(fields[1:])
+        else:
+            regexp = "{0}\s?#((\s|E)[^\r^\n]*)".format(re.escape(cmd))
+
+        try:
+            self.server.sendline(cmd)
+            self.server.expect(regexp, timeout=timeout)
+            out = self.server.match.group(0).split("\r\n")[0]
+        except pexpect.TIMEOUT:
+            if not bail_on_timeout:
+                out = cmd + " # ERROR: timed out after %d seconds" % timeout
+            else:
+                lines = [printer.msg('The command "', p=False),
+                         printer.cyan(cmd, p=False),
+                         printer.msg('"\n       produced unexpected output.  Consult the log file, e.g.', p=False),
+                         printer.msg('\n       "%s" gives this:' % printer.gray(tail, p=False), p=False),
+                         printer.error(msg)]
+                self.bail(lines, tail=True)
+
         if "ERROR" in out:
             printer.red(out)
         return out
