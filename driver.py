@@ -122,8 +122,8 @@ class driver:
         self.logfile.close()
 
 
-    def command(self, cmd, timeout=5):
-        out = ngfec.command(self.server, cmd, timeout=timeout)[0]
+    def command(self, cmd, timeout=5, dontexit=False):
+        out = ngfec.command(self.server, cmd, timeout=timeout, dontexit=dontexit)[0]
         if "ERROR" in out:
             printer.red(out)
         return out
