@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import driver, ngfec, printer
+import driver, printer
 import datetime, optparse, os, sys, time
 
 
@@ -202,7 +202,7 @@ class programmer(driver.driver):
             self.options.program = False
             functions = ["jtag"]
         else:
-            functions = ["check_version", "ground0", "disable", "reset_fec", "errors", "jtag", "check_version"]
+            functions = ["check_version", "ground0", "disable", "errors", "jtag", "check_version"]
 
         self.target, self.rbx = check_target(target)
         self.target0 = self.target.split("-")[0]
@@ -243,18 +243,6 @@ class programmer(driver.driver):
         self.command("tput %s-[1-4]-[1-4]-%s enable" % (self.rbx, stuff))
         self.command("tput %s-calib-%s enable" % (self.rbx, stuff))
         self.command("tput %s-bkp_jtag_sel %s-sel_sec_jtag enable" % (self.target0, self.target0))
-
-
-    def reset_fec(self):
-        if not hb(self.rbx):
-            print("Resetting JTAG part of FEC")
-            # ngfec.command(server, "put hefec3-cdce_sync 1")
-            # ngfec.command(server, "put hefec3-cdce_sync 0")
-            # ngfec.command(server, "put hefec3-gbt_bank_reset 0xff")
-            # ngfec.command(server, "put hefec3-gbt_bank_reset 0x00")
-            self.command("put %s-fec_jtag_part_reset 0" % self.target0)
-            self.command("put %s-fec_jtag_part_reset 1" % self.target0)
-            self.command("put %s-fec_jtag_part_reset 0" % self.target0)
 
 
     def enable(self):
@@ -324,7 +312,7 @@ class programmer(driver.driver):
 
     def action(self, word, stp, timeout, key="DSN", check_jtag=True):
         printer.cyan("%11s with %s (will time out in %4d seconds)" % (word, stp, timeout))
-        lines = ngfec.command(self.server, "jtag %s %s %s" % (stp, self.target, word), timeout=timeout)
+        lines = self.command("jtag %s %s %s" % (stp, self.target, word), timeout=timeout, only_first_line=False)
         self.check_exit_codes(lines)
         self.check_key(lines, key)
         if check_jtag:
