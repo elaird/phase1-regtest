@@ -124,19 +124,21 @@ def opts(full_rbx=False):
                       dest="stpJ15",
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_b2b_v5.2_20170928c.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.2_20170928c.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_DownReg_20181203c_fixed.stp",
+                      default="/nfshome0/sdg/phase1-regtest/HBHE_CCC_J15_half_speed_both_20190119a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_b2b_v5.2_20170928c.stp",
-                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.2_20170928c.stp",
+                      # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.2_20170928c.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_DownReg_20181203c_fixed.stp",
+                      default="/nfshome0/sdg/phase1-regtest/HBHE_CCC_J14_half_speed_both_20190119a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -202,7 +204,7 @@ class programmer(driver.driver):
             self.options.program = False
             functions = ["jtag"]
         else:
-            functions = ["check_version", "ground0", "disable", "errors", "jtag", "check_version"]
+            functions = ["check_version", "ground0", "disable", "errors", "jtag", "wait", "check_version"]
 
         self.target, self.rbx = check_target(target)
         self.target0 = self.target.split("-")[0]
@@ -215,10 +217,14 @@ class programmer(driver.driver):
         self.bail(minimal=self.options.deviceInfoOnly)
 
 
+    def wait(self):
+        if self.options.program:
+            time.sleep(5)
+
 
     def check_version(self):
         if self.target.endswith("neigh"):
-            cmd = "get %s_FPGA_SILSIG" % self.target.replace("neigh", "smezz")
+            cmd = "get %s_FPGA_SILSIG_rr" % self.target.replace("neigh", "smezz")
         elif self.target.endswith("pulser"):
             cmd = "get %s-fpga" % self.target.replace(self.target0, self.rbx)
         else:
