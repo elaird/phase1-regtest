@@ -39,6 +39,12 @@ def opts():
                       default=5,
                       type="int",
                       help="number of seconds over which to integrate link errors [default %default]")
+    parser.add_option("--temperature",
+                      dest="temperature",
+                      default=18.0,
+                      metavar="T",
+                      type="float",
+                      help="expected Peltier temperature (C) [default %default]")
     parser.add_option("--guardians",
                       dest="guardians",
                       default=False,
@@ -399,8 +405,11 @@ class commissioner(driver.driver):
             #     fw14 = 0x18120333
             #     fw15 = 0x18120323
         elif self.hb:
-            fw14 = None
-            fw15 = None
+            fw14 = 0x19010333
+            fw15 = 0x19010323
+            if self.sector == 12:
+                fw14 = None # 0x19011931
+                fw15 = None # 0x19011921
         else:
             fw14 = None
             fw15 = None
@@ -492,7 +501,7 @@ class commissioner(driver.driver):
 
             items = [("%d-PeltierVoltage_f_rr" % iRm, 3.0, 2.5),
                      ("%d-PeltierCurrent_f_rr" % iRm, 0.9, 0.75),
-                     ("%d-rtdtemperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
+                     ("%d-rtdtemperature_f_rr" % iRm, self.options.temperature, 2.0),
                      # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                     ]
             self.check(items)
