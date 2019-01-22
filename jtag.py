@@ -87,10 +87,6 @@ def opts(full_rbx=False):
                       default=64000,
                       type="int",
                       help="ngccmserver port number [default %default]")
-    parser.add_option("--log-file",
-                      dest="logfile",
-                      default="jtag.log",
-                      help="log file to which to append [default %default]")
     parser.add_option("--stp-igloo-HE",
                       dest="stpIglooHe",
                       metavar="a.stp",
@@ -183,6 +179,10 @@ def opts(full_rbx=False):
                           default=False,
                           action="store_true",
                           help="do PROGRAM")
+        parser.add_option("--log-file",
+                          dest="logfile",
+                          default="jtag.log",
+                          help="log file to which to append [default %default]")
 
     options, args = parser.parse_args()
 
