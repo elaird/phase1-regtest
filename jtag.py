@@ -124,7 +124,7 @@ def opts(full_rbx=False):
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_DownReg_20181203c_fixed.stp",
-                      default="/nfshome0/sdg/phase1-regtest/HBHE_CCC_J15_half_speed_both_20190119a_fixed.stp",
+                      default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J15_half_speed_both_20190119a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
@@ -134,7 +134,7 @@ def opts(full_rbx=False):
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_DownReg_20181203c_fixed.stp",
-                      default="/nfshome0/sdg/phase1-regtest/HBHE_CCC_J14_half_speed_both_20190119a_fixed.stp",
+                      default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J14_half_speed_both_20190119a_fixed.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -326,8 +326,12 @@ class programmer(driver.driver):
 
 
     def check_exit_codes(self, lines):
+        if len(lines) < 2:
+            self.bail(lines)
         if not lines[-2].endswith("# retcode=0"):
             self.bail(lines, note="retcode")
+        if len(lines) < 4:
+            self.bail(lines)
         if lines[-4] != 'Exit code = 0... Success':
             self.bail(lines, note="exitcode")
 
