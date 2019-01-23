@@ -167,6 +167,11 @@ def opts(full_rbx=False):
                       action="store_true",
                       help="do BYPASS_TEST")
     if full_rbx:
+        parser.add_option("--reverse",
+                          dest="reverse",
+                          default=False,
+                          action="store_true",
+                          help="start with 4-4 and proceed to 1-1")
         parser.add_option("--niterations",
                           dest="nIterations",
                           metavar="N",
