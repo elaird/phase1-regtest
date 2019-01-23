@@ -4,10 +4,16 @@ import collections, datetime, pickle, os
 import jtag, printer
 
 
-def targets(rbx):
+def targets(rbx, options):
     out = []
+    lst = []
     for iRm in range(1, 5):
         for iCard in range(1, 5):
+            lst.append((iRm, iCard))
+    if options.reverse:
+        lst.reverse()
+
+    for iRm, iCard in lst:
             if rbx.startswith("HE"):
                 out.append("%d-%d" % (iRm, iCard))
             if rbx.startswith("HB"):
@@ -31,7 +37,7 @@ def one(target, options):
 
 def results(rbx, options):
     out = collections.defaultdict(list)
-    for fpga in targets(rbx):
+    for fpga in targets(rbx, options):
         target = "%s-%s" % (rbx, fpga)
         options.logfile = "%s.log" % target
         try:
