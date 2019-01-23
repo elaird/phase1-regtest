@@ -60,7 +60,6 @@ class driver:
         if ccm:
             ccm2 = self.command(ccm_cmd)
             b2b2 = self.command(b2b_cmd)
-
         minimal = not store
 
         if fec and "ERROR" in self.fec1:
@@ -70,9 +69,9 @@ class driver:
         elif ccm and "ERROR" in self.b2b1:
             self.bail([""], minimal=minimal, note="ccm_err")
         elif fec and self.fec1 != fec2:
-            self.bail(["Link errors detected via FEC counters:", self.fec1[0], fec2[0]], minimal=minimal, note="fec_ber")
+            self.bail(["Link errors detected via FEC counters:", self.fec1, fec2], minimal=minimal, note="fec_ber")
         elif ccm and self.ccm1 != ccm2:
-            self.bail(["Link errors detected via CCM counters:", self.ccm1[0], ccm2[0]], minimal=minimal, note="ccm_ber")
+            self.bail(["Link errors detected via CCM counters:", self.ccm1, ccm2], minimal=minimal, note="ccm_ber")
         elif ccm and self.b2b1 != b2b2:
             lines = ["Link errors detected via CCM counters:", self.b2b1, b2b2]
             if store or (not self.target.endswith("neigh")):
