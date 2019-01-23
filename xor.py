@@ -58,7 +58,7 @@ def fill_location(h, number, maxBits):
             h.Fill(iBit)
 
 
-def one(d, nBitsMax):
+def one(t, nBitsMax):
     import ROOT as r
     r.gROOT.SetBatch(True)
     r.gStyle.SetOptStat("ourme")
@@ -75,6 +75,8 @@ def one(d, nBitsMax):
     header = "   block      delta   regBits^actBits (zero-ing LSB)"
     print header
     print "-" * 56
+
+    target, _, d = t
     blocks = sorted(d.keys())
     for iEntry, blockNo in enumerate(blocks):
         if iEntry:
@@ -97,7 +99,7 @@ def one(d, nBitsMax):
             if nMismatch == i:
                 fill_location(hLocs[i-1], xor, nBitsMax)
 
-    pdf = "%s.pdf" % filename
+    pdf = "%s.pdf" % target
     can = r.TCanvas()
     can.SetTickx()
     can.SetTicky()
@@ -166,6 +168,11 @@ def multi(lst, nBitsMax):
 
 def opts():
     parser = optparse.OptionParser("usage: %prog FILE ")
+    parser.add_option("--plots",
+                      dest="plots",
+                      default=False,
+                      action="store_true",
+                      help="make some plots")
     parser.add_option("--n-bits-max",
                       dest="nBitsMax",
                       default=128,
@@ -182,7 +189,7 @@ def opts():
 
 def main(options, filename):
     lst = list_of_pairs(filename)
-    if len(lst) == 1:
+    if len(lst) == 1 and options.plots:
         one(lst[0], options.nBitsMax)
     else:
         multi(lst, options.nBitsMax)
