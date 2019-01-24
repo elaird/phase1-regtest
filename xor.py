@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import optparse, pickle, sys
+import printer
 
 
 def list_of_pairs(filename):
@@ -125,8 +126,8 @@ def one(t, nBitsMax):
 
 
 def multi(lst, nBitsMax):
-    header1 = "|                                              |        *median values*        |"
-    header2 = "|  target        iter   N    block1    blockN  |     block     delta  nBitsXor |"
+    header1 = "|                                              |           **** median values ****           |"
+    header2 = "|  target        iter   N    block1    blockN  |     block     delta  nBitsXor  nBitsActZero |"
     topbar = "+%s+" % ("-" * (len(header1) - 2))
     bar = topbar.replace("+", "|")
     print topbar
@@ -144,11 +145,13 @@ def multi(lst, nBitsMax):
 
         deltas = []
         nMismatched = []
+        nBitsActZero = []
         for iEntry, blockNo in enumerate(blocks):
             if iEntry:
                 deltas.append(blockNo - blocks[iEntry - 1])
             regBits, actBits, xor = d[blockNo]
             nMismatched.append(nBits(xor, nBitsMax))
+            nBitsActZero.append(nBitsMax - nBits(actBits, nBitsMax))
 
         deltas.sort()
         nMismatched.sort()
@@ -160,14 +163,15 @@ def multi(lst, nBitsMax):
                          "|",
                          "%8d" % iBlockMed,
                          ("%8d" % deltas[len(deltas) / 2]) if deltas else " " * 8,
-                         "%5d  " % nMismatched[len(deltas) / 2],
+                         "%3d/128   " % nMismatched[len(deltas) / 2],
+                         "%3d/128  " % nBitsActZero[len(deltas) / 2],
                          "|",
                          ])
     print(topbar)
 
 
 def opts():
-    parser = optparse.OptionParser("usage: %prog FILE ")
+    parser = optparse.OptionParser("usage: %prog FILE [FILE2 ...] ")
     parser.add_option("--plots",
                       dest="plots",
                       default=False,
@@ -180,19 +184,25 @@ def opts():
                       help="number of bits to consider per block [default %default]")
     options, args = parser.parse_args()
 
-    if len(args) != 1:
+    if not args:
         parser.print_help()
         sys.exit(" ")
 
-    return options, args[0]
+    return options, args
 
 
-def main(options, filename):
-    lst = list_of_pairs(filename)
-    if len(lst) == 1 and options.plots:
-        one(lst[0], options.nBitsMax)
-    else:
-        multi(lst, options.nBitsMax)
+def main(options, filenames):
+    for filename in filenames:
+        try:
+            if 2 <= len(filenames):
+                print "\n", filename
+            lst = list_of_pairs(filename)
+            if len(lst) == 1 and options.plots:
+                one(lst[0], options.nBitsMax)
+            else:
+                multi(lst, options.nBitsMax)
+        except EOFError:
+            printer.red("EOFError")
 
 
 if __name__ == "__main__":
