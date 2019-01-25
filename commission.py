@@ -404,12 +404,16 @@ class commissioner(driver.driver):
             # if self.sector == 25:
             #     fw14 = 0x18120333
             #     fw15 = 0x18120323
+            sw15 = [1, 1, 0, 1]
+            sw14 = [1, 1, 1, 1]
         elif self.hb:
             fw14 = 0x19010333
             fw15 = 0x19010323
             if self.sector == 12:
                 fw14 = None # 0x19011931
                 fw15 = None # 0x19011921
+            sw15 = [1, 1, 0, 0]
+            sw14 = [1, 1, 1, 0]
         else:
             fw14 = None
             fw15 = None
@@ -425,6 +429,10 @@ class commissioner(driver.driver):
             lst = [("mezz_GEO_ADDR", 2, None),
                    ("mezz_FPGA_SILSIG_rr", fw15, None),
                    ("smezz_FPGA_SILSIG_rr", fw14, None)]
+        for iSw in range(4):
+            lst.append(("mezz_TEST_SW%d" % iSw, (sw14 if self.options.j14 else sw15)[iSw], None))
+        for iSw in range(4):
+            lst.append(("smezz_TEST_SW%d" % iSw, (sw15 if self.options.j14 else sw14)[iSw], None))
 
         if self.hb:
             lst += [("mezz_MASTER_B_ENABLE_rr", None, None),
