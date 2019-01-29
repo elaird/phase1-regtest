@@ -169,7 +169,6 @@ class commissioner(driver.driver):
         if options.guardians:
             self.guardians()
 
-
         if options.fec:
             self.fec()
 
@@ -234,10 +233,6 @@ class commissioner(driver.driver):
         # driver.connect assumes these are included as options
         self.options.host = host
         self.options.port = port
-
-
-    def guardians(self):
-        print self.command("table\ntget %s-lg fns3G" % self.rbx)
 
 
     def fec(self):
@@ -328,8 +323,6 @@ class commissioner(driver.driver):
                 fecs = "hbfec3"
                 sfp = self.sector - 12
 
-        print self.command("get ccmserver_version")
-
         print
         print("-" * 7)
         print("| FEC |")
@@ -340,6 +333,7 @@ class commissioner(driver.driver):
                     ("fec_ver_build_rr", fw[2], None),
                     ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
+                    ("cdce_pll_locked", 1, None),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
                     # qie_reset_cnt_rr
