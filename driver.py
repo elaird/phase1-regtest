@@ -11,7 +11,7 @@ class driver:
         self.target = target
 
         self.connect()
-        self.command("get ccmserver_version")
+        self.guardians()
         self.bail(minimal=True)
 
 
@@ -82,11 +82,21 @@ class driver:
 
     def ground0(self):
         if self.options.ground0:
-            print("Ground stating")
+            print("Ground stating (go_offline, ground0, waitG, push)")
             self.command("tput %s-lg go_offline" % self.rbx)
             self.command("tput %s-lg ground0" % self.rbx)
             self.command("tput %s-lg waitG" % self.rbx)
             self.command("tput %s-lg push" % self.rbx)
+
+
+    def guardians(self):
+        print("-" * 10)
+        print("| server |")
+        print("-" * 10)
+
+        print self.command("get ccmserver_version")
+        # print self.command("table")
+        # print self.command("tget %s-lg fns3G" % self.rbx)
 
 
     def bail(self, lines=[], minimal=False, note="unspecified", tail=False):
