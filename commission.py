@@ -320,7 +320,7 @@ class commissioner(driver.driver):
                 fecs = "hbfec2"
                 sfp = 2 * (self.sector - 6) - 1
             elif self.sector == 13:
-                fecs = "hbfec3"
+                fecs = "hbfec4"
                 sfp = self.sector - 12
 
         print
