@@ -334,6 +334,7 @@ class commissioner(driver.driver):
                     ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("cdce_pll_locked", 1, None),
+                    ("ig_ipBus_cnt", 0, 0),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
                     # qie_reset_cnt_rr
@@ -389,23 +390,17 @@ class commissioner(driver.driver):
 
 
     def ccm(self):
+        fw14 = 0x19012932
+        fw15 = 0x19012922
         if self.he:
-            fw14 = 0x17092813
-            fw15 = 0x17092803
+            # fw14 = 0x17092813
+            # fw15 = 0x17092803
             if self.sector == 0:
                 fw14 = 0x18082711
                 fw15 = 0x18082701
-            # if self.sector == 25:
-            #     fw14 = 0x18120333
-            #     fw15 = 0x18120323
             sw15 = [1, 1, 0, 1]
             sw14 = [1, 1, 1, 1]
         elif self.hb:
-            fw14 = 0x19010333
-            fw15 = 0x19010323
-            if self.sector == 12:
-                fw14 = None # 0x19011931
-                fw15 = None # 0x19011921
             sw15 = [1, 1, 0, 0]
             sw14 = [1, 1, 1, 0]
         else:
