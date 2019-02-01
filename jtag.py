@@ -97,6 +97,9 @@ def opts(full_rbx=False):
                       metavar="a.stp",
                       # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10.stp",  # always fails bypass_test
                       default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq_TMS10.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq_TMS10_4M.stp",
+                      # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq_TMS10_6M.stp",
                       # default="/nfshome0/elaird/firmware/fixed_HE_RM_v3_09_w_bypass_div8_max10_freq_shift.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB",
@@ -124,7 +127,8 @@ def opts(full_rbx=False):
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_DownReg_20181203c_fixed.stp",
-                      default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J15_half_speed_both_20190119a_fixed.stp",
+                      # default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J15_half_speed_both_20190119a_fixed.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J15_half_speed_both_v5.6_20190129b.stp",
                       help="[default %default]")
     parser.add_option("--stp-J14",
                       dest="stpJ14",
@@ -134,7 +138,8 @@ def opts(full_rbx=False):
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.3_20180824a.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_20181126a_fixed.stp",
                       # default="/nfshome0/elaird/firmware/HBHE_CCC_J14_half_speed_both_DownReg_20181203c_fixed.stp",
-                      default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J14_half_speed_both_20190119a_fixed.stp",
+                      # default="/nfshome0/sdg/phase1-regtest-ORIG/HBHE_CCC_J14_half_speed_both_20190119a_fixed.stp",
+                      default="/nfshome0/elaird/firmware/HBHE_CCC_J14_MM_half_speed_both_v5.6_20190129b.stp",
                       help="[default %default]")
     parser.add_option("--nseconds",
                       dest="nSeconds",
