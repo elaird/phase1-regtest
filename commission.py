@@ -344,49 +344,48 @@ class commissioner(driver.driver):
                    ], device=fecs)
 
         if self.hb:
-            for i, letter in enumerate("ab"):
-                print
-                print("-" * 14)
-                print("| FEC site %s |" % letter)
-                print("-" * 14)
-                self.check([("sfp%d_status.TxFault_rr" % (sfp + i), 0, None),
-                            ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
-                            ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
-                           ], device=fecs)
-                self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
-                            ("fec-sfp_tx_power_f", 550.0, 150.0),
-                           ], device="%s%s" % (self.rbx, letter))
-                old = not self.sector
-                if not old:
-                    self.check([("fec_min_phase", None, None),
-                                ("fec_max_phase", None, None),
-                            ], device="%s%s" % (self.rbx, letter))
-
-                self.errors(ccm=False, sleep=False, letter=letter, old=old)
-                if not old:
-                    print self.command("put %s-test_comm 1" % (self.rbx + letter))
-                    always = 0x8000
-                    self.check([("fecccm_test_comm_cnt", always, None),
-                                ("fecccm_sys_master_cnt", None, None),  # FIXME
-                                ("fecccm_sys_refclk_cnt", always, None),
-                                ("fecccm_epcs_cdr_locked_cnt", always, None),
-                                ("fecccm_rx_pll_locked_cnt", always, None),
-                                ("fecccm_rx_header_locked_cnt", always, None),
-                                ("fecccm_rx_is_data", 1, None),
-                                ("fecccm_rx_ready_cnt", always, None),
-                                ("fecccm_rx_data_valid_cnt", always, None),
-                               ], device="%s%s" % (self.rbx, letter))
-
-                self.errors(store=False, ccm=False, sleep=False, letter=letter, old=old)
+            letters = "ab"
         else:
-            self.check([("sfp%d_status.TxFault_rr" % sfp, 0, None),
-                        ("sfp%d_status.RxLOS_rr" % sfp, 0, None),
-                        ("sfp%d_gbt_rx_ready_rr" % sfp, 1, None),
+            letters = " "
+
+        old = self.hf or not self.sector
+
+        for i, letter in enumerate(letters):
+            if letter == " ":
+                letter = ""
+            print
+            print("-" * 14)
+            print("| FEC site %s |" % letter)
+            print("-" * 14)
+            self.check([("sfp%d_status.TxFault_rr" % (sfp + i), 0, None),
+                        ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
+                        ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
                        ], device=fecs)
             self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
                         ("fec-sfp_tx_power_f", 550.0, 150.0),
-                       ])
-            self.errors(ccm=False, old=not self.sector)
+                       ], device="%s%s" % (self.rbx, letter))
+
+            if not old:
+                self.check([("fec_min_phase", None, None),
+                            ("fec_max_phase", None, None),
+                        ], device="%s%s" % (self.rbx, letter))
+
+            self.errors(ccm=False, sleep=False, letter=letter, old=old)
+            if not old:
+                print self.command("put %s-test_comm 1" % (self.rbx + letter))
+                always = 0x8000
+                self.check([("fecccm_test_comm_cnt", always, None),
+                            ("fecccm_sys_master_cnt", None, None),  # FIXME
+                            ("fecccm_sys_refclk_cnt", always, None),
+                            ("fecccm_epcs_cdr_locked_cnt", always, None),
+                            ("fecccm_rx_pll_locked_cnt", always, None),
+                            ("fecccm_rx_header_locked_cnt", always, None),
+                            ("fecccm_rx_is_data", 1, None),
+                            ("fecccm_rx_ready_cnt", always, None),
+                            ("fecccm_rx_data_valid_cnt", always, None),
+                           ], device="%s%s" % (self.rbx, letter))
+
+            self.errors(store=False, ccm=False, sleep=False, letter=letter, old=old)
 
 
     def ccm(self):
