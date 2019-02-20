@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+from __future__ import print_function
 import pickle
 from commission import commissioner, opts
 
@@ -24,7 +25,7 @@ def main():
     f = open(filename, "w")
     pickle.dump(occupancies(options, arg), f)
     f.close()
-    print "Wrote results to", filename
+    print("Wrote results to", filename)
 
 
 if __name__ == "__main__":

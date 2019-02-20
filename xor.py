@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+from __future__ import print_function
 import optparse, pickle, sys
 import printer
 
@@ -74,8 +75,8 @@ def one(t, nBitsMax):
                             nBitsMax, -0.5, nBitsMax - 0.5))
 
     header = "   block      delta   regBits^actBits (zero-ing LSB)"
-    print header
-    print "-" * 56
+    print(header)
+    print("-" * 56)
 
     target, _, d = t
     blocks = sorted(d.keys())
@@ -88,10 +89,10 @@ def one(t, nBitsMax):
 
         regBits, actBits, xor = d[blockNo]
 
-        print "   ".join(["%8d" % blockNo,
+        print("   ".join(["%8d" % blockNo,
                           " " * 8 if delta is None else "%8d" % delta,
                           "0x%032x" % xor,
-                      ])
+                      ]))
 
         nMismatch = nBits(xor, nBitsMax)
         hMis.Fill(nMismatch)
@@ -130,18 +131,19 @@ def multi(lst, nBitsMax):
     header2 = "|  target        iter   N    block1    blockN  |     block     delta  nBitsXor  nBitsActZero |"
     topbar = "+%s+" % ("-" * (len(header1) - 2))
     bar = topbar.replace("+", "|")
-    print topbar
-    print header1
-    print header2
-    print bar
+    print(topbar)
+    print(header1)
+    print(header2)
+    print(bar)
 
     for (key, iteration, d) in lst:
         blocks = sorted(d.keys())
         if not blocks:
             continue
+        indexMed = int(len(blocks) / 2)
+        iBlockMed = blocks[indexMed]
         iBlockMin = min(blocks)
         iBlockMax = max(blocks)
-        iBlockMed = blocks[len(blocks) / 2]
 
         deltas = []
         nMismatched = []
@@ -155,18 +157,18 @@ def multi(lst, nBitsMax):
 
         deltas.sort()
         nMismatched.sort()
-        print "  ".join(["| %13s" % key,
+        print("  ".join(["| %13s" % key,
                          " %2d" % iteration,
                          " %2d" % len(blocks),
                          "%8d" % iBlockMin,
                          "%8d" % iBlockMax,
                          "|",
                          "%8d" % iBlockMed,
-                         ("%8d" % deltas[len(deltas) / 2]) if deltas else " " * 8,
-                         "%3d/128   " % nMismatched[len(deltas) / 2],
-                         "%3d/128  " % nBitsActZero[len(deltas) / 2],
+                         ("%8d" % deltas[int(len(deltas) / 2)]) if deltas else " " * 8,
+                         "%3d/128   " % nMismatched[indexMed],
+                         "%3d/128  " % nBitsActZero[indexMed],
                          "|",
-                         ])
+                         ]))
     print(topbar)
 
 
@@ -195,7 +197,7 @@ def main(options, filenames):
     for filename in filenames:
         try:
             if 2 <= len(filenames):
-                print "\n", filename
+                print("\n", filename)
             lst = list_of_pairs(filename)
             if len(lst) == 1 and options.plots:
                 one(lst[0], options.nBitsMax)
