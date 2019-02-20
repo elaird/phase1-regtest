@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import driver, printer
 from powerMon import commandOutputFull
@@ -323,7 +323,7 @@ class commissioner(driver.driver):
                 fecs = "hbfec4"
                 sfp = self.sector - 12
 
-        print
+        print("")
         print("-" * 7)
         print("| FEC |")
         print("-" * 7)
@@ -353,7 +353,7 @@ class commissioner(driver.driver):
         for i, letter in enumerate(letters):
             if letter == " ":
                 letter = ""
-            print
+            print("")
             print("-" * 14)
             print("| FEC site %s |" % letter)
             print("-" * 14)
@@ -372,7 +372,7 @@ class commissioner(driver.driver):
 
             self.errors(ccm=False, sleep=False, letter=letter, old=old)
             if not old:
-                print self.command("put %s-test_comm 1" % (self.rbx + letter))
+                print(self.command("put %s-test_comm 1" % (self.rbx + letter)))
                 always = 0x8000
                 self.check([("fecccm_test_comm_cnt", always, None),
                             ("fecccm_sys_master_cnt", None, None),  # FIXME
@@ -464,14 +464,14 @@ class commissioner(driver.driver):
 
         if self.hb:
             for letter in "ab":
-                print
+                print("")
                 print("-" * 8)
                 print("| CCM%s |" % letter)
                 print("-" * 8)
                 self.check(lst, device="%s%s" % (self.rbx, letter))
                 self.errors(fec=False, letter=letter, old=not self.sector)
         else:
-            print
+            print("")
             print("-" * 7)
             print("| CCM |")
             print("-" * 7)
@@ -483,14 +483,14 @@ class commissioner(driver.driver):
         for iV in range(0, 75, 5):
             target = "HEP05-4"
             ch = 2
-            print self.command("put %s-biasvoltage%d_f %4.1f" % (target, ch, iV))
-            print self.command("get %s-biasmon%d_f_rr" % (target, ch))
+            print(self.command("put %s-biasvoltage%d_f %4.1f" % (target, ch, iV)))
+            print(self.command("get %s-biasmon%d_f_rr" % (target, ch)))
             time.sleep(2)
 
 
     def bv(self):
         for iRm in range(1, 5):
-            print
+            print("")
             print("-" * 25)
             print("| BV and Peltier (RM %d) |" % iRm)
             print("-" * 25)
@@ -513,7 +513,7 @@ class commissioner(driver.driver):
         if self.options.set_bv:
             for value in [0.0, 67.0]:
                 for iRm in range(1, 5):
-                    print self.command("put %s-%d-biasvoltage[1-48]_f 48*%3.1f" % (self.rbx, iRm, value))
+                    print(self.command("put %s-%d-biasvoltage[1-48]_f 48*%3.1f" % (self.rbx, iRm, value)))
                     self.check([("%d-biasmon[1-48]_f_rr" % iRm, value, 0.3)])
 
 
@@ -549,7 +549,7 @@ class commissioner(driver.driver):
                     if iQieCard == 1:
                         stem = "calib"
                         stemQ = stem
-                        qie = "QIE[1-%s]" % (nCh / 4)
+                        qie = "QIE[1-%s]" % int(nCh / 4)
                     else:
                         continue
                 else:
@@ -625,9 +625,9 @@ class commissioner(driver.driver):
                     nQie = 48
 
             if put:
-                print self.command("put %s-%s-%s_PhaseDelay %d*64" % (self.rbx, stemQ, qie, nQie))
+                print(self.command("put %s-%s-%s_PhaseDelay %d*64" % (self.rbx, stemQ, qie, nQie)))
             else:
-                print self.command("get %s-%s-%s_PhaseDelay_rr" % (self.rbx, stemQ, qie))
+                print(self.command("get %s-%s-%s_PhaseDelay_rr" % (self.rbx, stemQ, qie)))
 
 
     def uhtr(self, check=True):
@@ -644,7 +644,7 @@ class commissioner(driver.driver):
               try:
                   # http://cmsdoc.cern.ch/cms/HCAL/document/CountingHouse/Crates/Crate_interfaces_2017.htm
                   crates = [30, 24, 20, 21, 25, 31, 35, 37, 34, 30]  # 30 serves sectors 18 and 1
-                  crate = crates[self.sector / 2]
+                  crate = crates[int(self.sector / 2)]
                   slot1 = 6 * iEnd + 3 * (self.sector % 2) + 1 + int(self.he)
                   slot2 = slot1 + 1
               except IndexError:
@@ -652,10 +652,10 @@ class commissioner(driver.driver):
                   return
         elif self.he:  # 904
             ss = self.sector - 1
-            crate = 61 + ss / 9
+            crate = 61 + int(ss / 9)
             if 9 <= ss:
                 ss -= 9
-            slot1 = 1 + 4 * ss / 3
+            slot1 = 1 + 4 * int(ss / 3)
             slot2 = slot1 + 1
 
         out = []
@@ -668,7 +668,7 @@ class commissioner(driver.driver):
             if not check:
                 continue
 
-            print "Crate %d Slot %2d" % (crate, slot)
+            print("Crate %d Slot %2d" % (crate, slot))
             link_headers = link[19:]
             # https://github.com/elaird/hcalraw/blob/master/data/ref_2018.txt
             if self.hb or self.he:
@@ -694,7 +694,7 @@ class commissioner(driver.driver):
                 else:
                     link_headers = " rx00      rx01      rx02      rx03      rx04      rx05      rx06      rx07      rx08      rx09      rx10      rx11     "
 
-            print link[:19] + link_headers
+            print(link[:19] + link_headers)
             self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
             self.uhtr_compare(slot, ppod, bad8b10b, 0, threshold=0)
             self.uhtr_compare(slot, ppod, bc0, 0.1 if self.hb else 11.2, threshold=(0.01 if self.hb else 1.0))
@@ -713,11 +713,11 @@ class commissioner(driver.driver):
 
     def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False, dec=False):
         iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst)
-        n = (len(lst) - 19) / 12
+        n = int((len(lst) - 19) / 12)
         if doubled:
             iStart *= 2
             iEnd *= 2
-            n /= 2
+            n = int(n / 2)
 
         msg = lst[:19]
         for i, x in enumerate(items):
@@ -741,7 +741,7 @@ class commissioner(driver.driver):
             else:
                 msg += space + printer.green(x, p=False) + " "
 
-        print msg
+        print(msg)
 
 
     def uhtr_range_and_items(self, slot, ppod, lst):
@@ -785,7 +785,7 @@ class commissioner(driver.driver):
                 res = self.command("get %s-%s" % (device, item), timeout=timeout)
             if expected is None:
                 if "ERROR" not in res:
-                    print res
+                    print(res)
             else:
                 if threshold is None:
                     self.compare(res, expected)
@@ -812,7 +812,7 @@ class commissioner(driver.driver):
                                    printer.purple("(expected %s)" % str(expected), p=False)))
             self.bail([msg] if msg else [])
         else:
-            print res
+            print(res)
 
 
     def compare_with_threshold(self, res, expected, threshold, msg=""):
@@ -848,7 +848,7 @@ class commissioner(driver.driver):
             self.bail([msg] if msg else [])
         else:
             if "ERROR" not in res:
-                print res
+                print(res)
 
 
     def bail(self, lines=None, minimal=False, note=""):

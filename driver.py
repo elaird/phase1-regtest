@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import printer
 import collections, datetime, os, pexpect, re, sys, time
@@ -94,7 +94,7 @@ class driver:
         print("| server |")
         print("-" * 10)
 
-        print self.command("get ccmserver_version")
+        print(self.command("get ccmserver_version"))
         # print self.command("table")
         # print self.command("tget %s-lg fns3G" % self.rbx)
 
