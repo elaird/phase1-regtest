@@ -241,9 +241,7 @@ class commissioner(driver.driver):
 
         # hbhe_full = (3, 1, 2, 0x14032018)
         hbhe_full = (3, 1, 2, 0x20102017)
-        hbhe_half = (4, 2, 0xf, 0x12122018)
-        hbhe_expr = (4, 3, 3, 0x1052019)
-
+        hbhe_half = (4, 3, 9, 0x2102019)
         fecs = "unknown"
         sfp = 99
 
@@ -277,11 +275,11 @@ class commissioner(driver.driver):
                 fecs = "hefec1"
                 sfp = 2
             elif self.rbx == "HE25":
-                fw = hbhe_expr
+                fw = hbhe_half
                 fecs = "hefec5"
                 sfp = 1
             elif self.rbx == "HE25R":
-                fw = hbhe_expr
+                fw = hbhe_half
                 fecs = "hefec5"
                 sfp = 2
         elif self.hf:
@@ -305,7 +303,7 @@ class commissioner(driver.driver):
                 fecs = "hffec3"
                 sfp = 7
         elif self.hb:
-            fw = hbhe_expr
+            fw = hbhe_half
             if self.sector == 0:
                 fecs = "hefec1"
                 fw = hbhe_full
