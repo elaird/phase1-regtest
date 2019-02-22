@@ -505,7 +505,7 @@ class commissioner(driver.driver):
                 nCh = 48 if self.he else 64
                 self.check([("%d-BVin_f_rr" % iRm, 100.0, 4.0),
                             ("%d-biasmon[1-%d]_f_rr" % (iRm, nCh), 67.0, 3.0),
-                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 13.5, 9.5),
+                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 12.0, 8.0), # https://indico.cern.ch/event/800901/
                            ])
 
         if self.options.set_bv:
