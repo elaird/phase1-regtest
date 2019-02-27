@@ -8,7 +8,8 @@ def main():
     for iRbx in range(1, 14):
         for iRm in range(1, 5):
             target = "HB%d-%d" % (iRbx, iRm)
-            p = scan_bv.scanner(options, [target])
+            if not options.onlyPlot:
+                p = scan_bv.scanner(options, [target])
             plot_scan.main("%s.pickle" % target)
 
 
