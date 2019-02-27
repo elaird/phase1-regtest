@@ -54,12 +54,12 @@ def opts(multi_target=False):
         parser.print_help()
         sys.exit(" ")
 
-    return options, args[0]
+    return options, args
 
 
 class scanner(driver.driver):
-    def __init__(self, options, target):
-        self.target, self.rbx = check_target(target)
+    def __init__(self, options, args):
+        self.target, self.rbx = check_target(args[0])
 
         self.options = options
         self.options.logfile = self.target + ".log"
