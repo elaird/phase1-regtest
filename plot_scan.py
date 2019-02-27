@@ -172,6 +172,7 @@ def main(nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
     histogram_fit_results(p_currents, nCh, can, outFile, title="I leak", unit="uA")
     can.Print(outFile + "]")
+    print("Wrote %s" % outFile)
 
 
 if __name__ == "__main__":
