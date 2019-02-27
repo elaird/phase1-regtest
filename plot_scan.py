@@ -49,6 +49,30 @@ def graphs(inFile, nCh, biasMonLsb, leakLsb):
     return g_voltages, g_currents
 
 
+def fit1(g, f, y0, xMin, xMax, target, iGraph):
+    dct = {}
+    for ini in [0.0, 20.0, 40.0, 60.0]:
+        f.SetParameters(y0, ini, 0.15)
+        f.SetParLimits(1, xMin, xMax)
+        g.Fit(f, "q")
+
+        prob = f.GetProb()
+        dct[prob] = {}
+        for iPar in range(3):
+            dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+        if 0.2 < prob:
+            break
+
+    best_prob = max(dct.keys())
+    if best_prob < 0.1:
+        print("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, prob))
+
+    out = {}
+    out[-1] = best_prob
+    out.update(dct[best_prob])
+    return out
+
+
 def fits(lst, xMin, xMax, target):
     out = []
 
@@ -60,16 +84,8 @@ def fits(lst, xMin, xMax, target):
             continue
         x = g.GetX()
         y = g.GetY()
-        f.SetParameters(y[0], y[0], 0.15)
-        f.SetParLimits(1, xMin, xMax)
-        g.Fit(f, "q")
 
-        prob = f.GetProb()
-        if prob < 0.1:
-            print("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, prob))
-        out.append({-1: prob})
-        for iPar in range(3):
-            out[-1][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+        out.append(fit1(g, f, y[0], xMin, xMax, target, iGraph))
     return out
 
 
@@ -110,7 +126,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile):
     can.Print(outFile)
 
 
-def histogram_fit_results(d, nCh, can, outFile, target, title, unit):
+def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=False):
     if not d:
         return
 
@@ -146,6 +162,9 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit):
         h.SetMarkerColor(h.GetLineColor())
         h.GetYaxis().SetRangeUser(yMin[iPar], yMax[iPar])
         can.Print(outFile)
+
+    if not do_corr:
+        return
 
     null = r.TH2D("h2", "%s;%s;%s;" % (full_title, par_name[0], par_name[1]), 1, yMin[0], yMax[0], 1, yMin[1], yMax[1])
     null.SetStats(False)
