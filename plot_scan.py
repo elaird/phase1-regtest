@@ -7,7 +7,7 @@ import ROOT as r
 def results(filename):
     out = []
     with open(filename, 'rb') as f:
-        d = pickle.load(f, encoding='latin1')
+        d = pickle.load(f)
     return d
 
 
