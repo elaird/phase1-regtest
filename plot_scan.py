@@ -5,10 +5,13 @@ import ROOT as r
 
 
 def results(filename):
-    out = []
-    with open(filename, 'rb') as f:
-        d = pickle.load(f)
-    return d
+    try:
+        with open(filename, 'rb') as f:
+            d = pickle.load(f)
+        return d
+    except IOError as e:
+        print("Failed to open %s" % filename)
+        return {}
 
 
 def vi_dicts(inFile):
@@ -46,21 +49,25 @@ def graphs(inFile, nCh, biasMonLsb, leakLsb):
     return g_voltages, g_currents
 
 
-def fits(lst, xMin, xMax):
+def fits(lst, xMin, xMax, target):
     out = []
 
     f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", xMin, xMax)
     f.SetLineWidth(1)
-    for g in lst:
+    for iGraph, g in enumerate(lst):
         n = g.GetN()
+        if not n:
+            continue
         x = g.GetX()
         y = g.GetY()
-            
         f.SetParameters(y[0], y[0], 0.15)
         f.SetParLimits(1, xMin, xMax)
         g.Fit(f, "q")
 
-        out.append({-1: f.GetProb()})
+        prob = f.GetProb()
+        if prob < 0.1:
+            print("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, prob))
+        out.append({-1: prob})
         for iPar in range(3):
             out[-1][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
     return out
@@ -104,6 +111,9 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile):
 
 
 def histogram_fit_results(d, nCh, can, outFile, target, title, unit):
+    if not d:
+        return
+
     can.Divide(0)
     can.Clear()
     can.SetTickx()
@@ -174,13 +184,16 @@ def main(inFile, nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbL
     target = inFile.replace(".pickle", "")
     g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb, hbLeakLsb if inFile.startswith("HB") else heLeakLsb)
     can = r.TCanvas()
-    can.Print(outFile + "[")
 
-    p_voltages = fits(g_voltages, bvSetMin, bvSetMax)
-    p_currents = fits(g_currents, bvSetMin, bvSetMax)
+    p_voltages = fits(g_voltages, bvSetMin, bvSetMax, target)
+    p_currents = fits(g_currents, bvSetMin, bvSetMax, target)
+
+    if not p_voltages:
+        return
+
+    can.Print(outFile + "[")
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile)
     # histogram_fit_results(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
-
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
     histogram_fit_results(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
     can.Print(outFile + "]")
