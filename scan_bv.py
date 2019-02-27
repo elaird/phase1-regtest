@@ -26,7 +26,7 @@ def check_target(target):
 
 
 def opts():
-    parser = optparse.OptionParser(usage="usage: %prog [options] RBX")
+    parser = optparse.OptionParser(usage="usage: %prog [options] RBX-RM")
     parser.add_option("--nseconds",
                       dest="nSeconds",
                       default=1,
