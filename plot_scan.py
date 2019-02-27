@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import pickle, sys
+import optparse, pickle, sys
 import ROOT as r
 
 
@@ -103,7 +103,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile):
     can.Print(outFile)
 
 
-def histogram_fit_results(d, nCh, can, outFile, title, unit):
+def histogram_fit_results(d, nCh, can, outFile, target, title, unit):
     can.Divide(0)
     can.Clear()
     can.SetTickx()
@@ -116,8 +116,8 @@ def histogram_fit_results(d, nCh, can, outFile, title, unit):
         yMin = {-1: 0.0, 0:  0.0, 1:  0.0, 2:-0.15}
         yMax = {-1: 1.1, 0: 10.0, 1: 30.0, 2: 0.35}
 
-    par_name = {-1: "Chi2 probability", 0:"baseline (%s)" % unit, 1:"kink voltage (V)", 2:"slope (%s / V)" % unit}
-    full_title = "fit results: %s" % title
+    par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
+    full_title = "%s: %s" % (target, title)
 
     for iPar in range(-1, 3, 1):
         h = r.TH1D("h", "%s;QIE channel number;%s" % (full_title, par_name[iPar]), nCh, 0.5, 0.5 + nCh)
@@ -155,11 +155,23 @@ def histogram_fit_results(d, nCh, can, outFile, title, unit):
     null.Draw()
     corr.Draw("psame")
     can.Print(outFile)
-        
 
-def main(nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0.244, heLeakLsb=0.122):
-    inFile = sys.argv[1]
+
+def opts():
+    parser = optparse.OptionParser(usage="usage: %prog [options] PICKLED_FILE")
+
+    options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.print_help()
+        sys.exit(" ")
+
+    return options, args[0]
+
+
+def main(inFile, nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0.244, heLeakLsb=0.122):
     outFile = inFile.replace(".pickle", ".pdf")
+    target = inFile.replace(".pickle", "")
     g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb, hbLeakLsb if inFile.startswith("HB") else heLeakLsb)
     can = r.TCanvas()
     can.Print(outFile + "[")
@@ -167,10 +179,10 @@ def main(nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0
     p_voltages = fits(g_voltages, bvSetMin, bvSetMax)
     p_currents = fits(g_currents, bvSetMin, bvSetMax)
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile)
-    histogram_fit_results(p_voltages, nCh, can, outFile, title="BV meas", unit="V")
+    # histogram_fit_results(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
 
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
-    histogram_fit_results(p_currents, nCh, can, outFile, title="I leak", unit="uA")
+    histogram_fit_results(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
 
@@ -178,4 +190,4 @@ def main(nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
     r.gErrorIgnoreLevel = r.kError    
-    main()
+    main(opts()[1])
