@@ -25,7 +25,7 @@ def check_target(target):
     return target, rbx
 
 
-def opts():
+def opts(multi_target=False):
     parser = optparse.OptionParser(usage="usage: %prog [options] RBX-RM")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -50,7 +50,7 @@ def opts():
 
     options, args = parser.parse_args()
 
-    if len(args) != 1:
+    if len(args) != 1 and not multi_target:
         parser.print_help()
         sys.exit(" ")
 
