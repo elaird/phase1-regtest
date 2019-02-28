@@ -30,7 +30,7 @@ def vi_dicts(inFile):
     return voltage, current
 
 
-def graphs(inFile, nCh, biasMonLsb, leakLsb):
+def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
     g_voltages = []
     g_currents = []
     for iCh in range(nCh):
@@ -38,16 +38,19 @@ def graphs(inFile, nCh, biasMonLsb, leakLsb):
         g_currents.append(r.TGraphErrors())
         
     d_voltages, d_currents = vi_dicts(inFile)
-    iPoint = -1
     for setting in sorted(d_voltages.keys()):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
-        iPoint += 1
         for iCh in range(nCh):
-            g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
-            g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonLsb)
-            g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
-            g_currents[iCh].SetPointError(iPoint, 0.0, leakLsb)
+            if biasMin < voltages[iCh]:
+                iPoint = g_voltages[iCh].GetN()
+                g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
+                g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
+            if leakMin < currents[iCh]:
+                iPoint = g_currents[iCh].GetN()
+                g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
+                g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
+
     return g_voltages, g_currents
 
 
@@ -159,8 +162,8 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
         yMin = {-1: 0.0, 0: 0.0, 1: 0.0, 2:0.99}
         yMax = {-1: 1.1, 0: 0.1, 1: 0.4, 2:1.01}
     else:
-        yMin = {-1: 0.0, 0:  0.0, 1:-30.0, 2:-0.15}
-        yMax = {-1: 1.1, 0: 10.0, 1: 30.0, 2: 0.35}
+        yMin = {-1: 0.0, 0:  0.0, 1:-80.0, 2:-0.15}
+        yMax = {-1: 1.1, 0: 10.0, 1: 80.0, 2: 0.35}
 
     par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
     full_title = "%s: %s" % (target, title)
@@ -275,7 +278,9 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
     final = inFile.split("/")[-1]
     if final.startswith("HB"):
         nCh = 64
-        leakLsb = 0.244  # uA / ADC
+        leakLsb = 0.244      # uA / ADC
+        biasMin = 0.0586081  # ADC = 0
+        leakMin = 1.708      # ADC = 0
     elif final.starswith("HE"):
         nCh = 48
         leakLsb = 0.122  # uA / ADC
@@ -284,11 +289,14 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor)
+    g_voltages, g_currents = graphs(inFile, nCh,
+                                    biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
+                                    biasMin*1.001, leakMin*1.001)
+
     can = r.TCanvas()
 
-    p_voltages = fits(g_voltages, options, target, 0.0586081, 1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
-    p_currents = fits(g_currents, options, target, 1.708,    0.15, I_pvalues, I_slopes, I_slopes_rel)
+    p_voltages = fits(g_voltages, options, target, biasMin,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
+    p_currents = fits(g_currents, options, target, leakMin, 0.15, I_pvalues, I_slopes, I_slopes_rel)
 
     if not p_voltages:
         return
