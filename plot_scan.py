@@ -54,7 +54,7 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
     return g_voltages, g_currents
 
 
-def fit1(g, f, p0_ini, p2_ini, options, target, iGraph, fix_p0=True):
+def fit3_1(g, f, p0_ini, p2_ini, options, target, iGraph, fix_p0=True):
     dct = {}
     for factor in [0.0, 0.5, -0.5, 1.0, -1.0]:
         p1_ini = options.bvMin + factor * (options.bvMax - options.bvMin)
@@ -82,7 +82,59 @@ def fit1(g, f, p0_ini, p2_ini, options, target, iGraph, fix_p0=True):
     return out
 
 
-def fits(lst, options, target, p0_ini, p2_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
+def fits2_1(g, f, p1_ini, options, target, iGraph):
+    dct = {}
+    for factor in [0.0, 0.5, -0.5, 1.0, -1.0]:
+        p0_ini = options.bvMin + factor * (options.bvMax - options.bvMin)
+        f.SetParameters(p0_ini, p1_ini)
+        g.Fit(f, "q")
+
+        prob = f.GetProb()
+        dct[prob] = {}
+        for iPar in range(2):
+            dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+        if options.threshold_pvalue_refit < prob:
+            break
+
+    best_prob = max(dct.keys())
+
+    out = {}
+    out[-1] = best_prob
+    out.update(dct[best_prob])
+    return out
+
+
+def fits2(lst, options, target, p1_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
+    out = []
+
+    f = r.TF1("f", "[0] + [1]*x", options.bvMin, options.bvMax)
+    f.SetLineWidth(1)
+    for iGraph, g in enumerate(lst):
+        if not g.GetN():
+            continue
+
+        out.append(fits2_1(g, f, p1_ini, options, target, iGraph))
+
+        res = out[-1]
+        pvalue = res[-1]
+        h_pvalues.Fill(pvalue)
+        if warn and pvalue < options.threshold_pvalue_warn:
+            printer.red("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, pvalue))
+
+        slope = res[1][0]
+        h_slopes.Fill(slope)
+        if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
+            printer.purple("WARNING: fit slope %g" % slope)
+
+        if slope:
+            rel_unc = res[1][1] / slope
+            h_slopes_rel.Fill(rel_unc)
+            if warn and options.threshold_rel_unc_warn < rel_unc:
+                printer.cyan("WARNING: fit rel unc %g" % rel_unc)
+    return out
+
+
+def fits3(lst, options, target, p0_ini, p2_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
     out = []
 
     f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", options.bvMin, options.bvMax)
@@ -91,7 +143,7 @@ def fits(lst, options, target, p0_ini, p2_ini, h_pvalues, h_slopes, h_slopes_rel
         if not g.GetN():
             continue
 
-        out.append(fit1(g, f, p0_ini, p2_ini, options, target, iGraph))
+        out.append(fits3_1(g, f, p0_ini, p2_ini, options, target, iGraph))
 
         res = out[-1]
         pvalue = res[-1]
@@ -159,16 +211,21 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
     can.SetTicky()
 
     if unit == "V":
-        yMin = {-1: 0.0, 0: 0.0, 1: 0.0, 2:0.99}
-        yMax = {-1: 1.1, 0: 0.1, 1: 0.4, 2:1.01}
+        # yMin = {-1: 0.0, 0: 0.0, 1: 0.0, 2:0.99}
+        # yMax = {-1: 1.1, 0: 0.1, 1: 0.4, 2:1.01}
+        yMin = {-1: 0.0, 0: 0.0, 1: 0.99}
+        yMax = {-1: 1.1, 0: 0.4, 1: 1.01}
     else:
-        yMin = {-1: 0.0, 0:  0.0, 1:-80.0, 2:-0.15}
-        yMax = {-1: 1.1, 0: 10.0, 1: 80.0, 2: 0.35}
+        # yMin = {-1: 0.0, 0:  0.0, 1:-80.0, 2:-0.15}
+        # yMax = {-1: 1.1, 0: 10.0, 1: 80.0, 2: 0.35}
+        yMin = {-1: 0.0, 0:-20.0, 1:-0.15}
+        yMax = {-1: 1.1, 0: 20.0, 1: 0.35}
 
-    par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
+    # par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
+    par_name = {-1: "fit probability", 0:"fit offset (%s)" % unit, 1:"fit slope (%s / V)" % unit}
     full_title = "%s: %s" % (target, title)
 
-    for iPar in range(-1, 3, 1):
+    for iPar in range(-1, 2, 1):
         h = r.TH1D("h", "%s;QIE channel number;%s" % (full_title, par_name[iPar]), nCh, 0.5, 0.5 + nCh)
         h.SetStats(False)
         for iCh in range(nCh):
@@ -295,8 +352,10 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
 
     can = r.TCanvas()
 
-    p_voltages = fits(g_voltages, options, target, biasMin,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
-    p_currents = fits(g_currents, options, target, leakMin, 0.15, I_pvalues, I_slopes, I_slopes_rel)
+    # p_voltages = fits3(g_voltages, options, target, biasMin,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
+    # p_currents = fits3(g_currents, options, target, leakMin, 0.15, I_pvalues, I_slopes, I_slopes_rel)
+    p_voltages = fits2(g_voltages, options, target,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
+    p_currents = fits2(g_currents, options, target, 0.15, I_pvalues, I_slopes, I_slopes_rel)
 
     if not p_voltages:
         return
@@ -361,8 +420,7 @@ def main(options, args):
     for arg in args:
         one(arg, options, *h)
 
-    if 2 <= len(args):
-        draw_summary(options, h)
+    draw_summary(options, h)
 
 
 if __name__ == "__main__":
