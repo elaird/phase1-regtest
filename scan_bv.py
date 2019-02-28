@@ -47,12 +47,6 @@ def opts(multi_target=False):
                       default=5,
                       type="int",
                       help="step size (V) [default %default]")
-    if multi_target:
-        parser.add_option("--only-plot",
-                          dest="onlyPlot",
-                          default=False,
-                          action="store_true",
-                          help="do not scan.")
 
     options, args = parser.parse_args()
 
