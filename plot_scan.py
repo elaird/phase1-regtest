@@ -51,13 +51,17 @@ def graphs(inFile, nCh, biasMonLsb, leakLsb):
     return g_voltages, g_currents
 
 
-def fit1(g, f, y0, options, target, iGraph):
+def fit1(g, f, p0_ini, p2_ini, options, target, iGraph, fix_p0=True):
     dct = {}
-    nIni = 4
-    for iIni in range(nIni):
-        ini = options.bvMin + iIni * (options.bvMax - options.bvMin) / nIni
-        f.SetParameters(y0, ini, 0.15)
-        f.SetParLimits(1, options.bvMin, options.bvMax)
+    for factor in [0.0, 0.5, -0.5, 1.0, -1.0]:
+        p1_ini = options.bvMin + factor * (options.bvMax - options.bvMin)
+        if fix_p0:
+            f.SetParameters(p0_ini, p1_ini, p2_ini)
+            f.FixParameter(0, p0_ini)
+        else:
+            f.SetParameters(p0_ini, p1_ini, p2_ini)
+            f.SetParLimits(1, options.bvMin, options.bvMax)
+
         g.Fit(f, "q")
 
         prob = f.GetProb()
@@ -75,7 +79,7 @@ def fit1(g, f, y0, options, target, iGraph):
     return out
 
 
-def fits(lst, options, target, h_pvalues, h_slopes, h_slopes_rel, warn=True):
+def fits(lst, options, target, p0_ini, p2_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
     out = []
 
     f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", options.bvMin, options.bvMax)
@@ -83,7 +87,8 @@ def fits(lst, options, target, h_pvalues, h_slopes, h_slopes_rel, warn=True):
     for iGraph, g in enumerate(lst):
         if not g.GetN():
             continue
-        out.append(fit1(g, f, g.GetY()[0], options, target, iGraph))
+
+        out.append(fit1(g, f, p0_ini, p2_ini, options, target, iGraph))
 
         res = out[-1]
         pvalue = res[-1]
@@ -154,7 +159,7 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
         yMin = {-1: 0.0, 0: 0.0, 1: 0.0, 2:0.99}
         yMax = {-1: 1.1, 0: 0.1, 1: 0.4, 2:1.01}
     else:
-        yMin = {-1: 0.0, 0:  0.0, 1:  0.0, 2:-0.15}
+        yMin = {-1: 0.0, 0:  0.0, 1:-30.0, 2:-0.15}
         yMax = {-1: 1.1, 0: 10.0, 1: 30.0, 2: 0.35}
 
     par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
@@ -215,7 +220,7 @@ def opts():
                       help="maximum of plot x-axis [default %default]")
     parser.add_option("--lsb-factor",
                       dest="lsbFactor",
-                      default=1.0,
+                      default=0.5,
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for uncertainties [default %default]")
@@ -226,7 +231,7 @@ def opts():
                       help="summary file [default %default]")
     parser.add_option("--threshold-rel-unc-warn",
                       dest="threshold_rel_unc_warn",
-                      default=0.1,
+                      default=0.05,
                       type="float",
                       metavar="x",
                       help="rel unc above which to warn  [default %default]")
@@ -244,13 +249,13 @@ def opts():
                       help="slope above which to warn  [default %default]")
     parser.add_option("--threshold-pvalue-warn",
                       dest="threshold_pvalue_warn",
-                      default=0.2,
+                      default=0.005,
                       type="float",
                       metavar="x",
                       help="fit probability below which to warn  [default %default]")
     parser.add_option("--threshold-pvalue-refit",
                       dest="threshold_pvalue_refit",
-                      default=0.2,
+                      default=0.01,
                       metavar="x",
                       type="float",
                       help="fit probability below which to refit [default %default]")
@@ -282,8 +287,8 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
     g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor)
     can = r.TCanvas()
 
-    p_voltages = fits(g_voltages, options, target, V_pvalues, V_slopes, V_slopes_rel, warn=False)
-    p_currents = fits(g_currents, options, target, I_pvalues, I_slopes, I_slopes_rel)
+    p_voltages = fits(g_voltages, options, target, 0.0586081, 1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
+    p_currents = fits(g_currents, options, target, 1.708,    0.15, I_pvalues, I_slopes, I_slopes_rel)
 
     if not p_voltages:
         return
@@ -304,14 +309,16 @@ def draw_summary(options, lst):
     can.Print(outFile + "[")
     can.SetTickx()
     can.SetTicky()
-    can.SetLogy()
 
     line = r.TLine()
     line.SetLineColor(r.kMagenta)
+    line.SetLineStyle(2)
 
     for h in lst:
         h.Draw()
+        h.SetLineWidth(2)
         h.SetMinimum(0.5)
+        can.SetLogy("pvalue" not in h.GetName())
 
         if h.GetName().startswith("Ileak"):
             xs = []
@@ -333,14 +340,14 @@ def draw_summary(options, lst):
 
 
 def main(options, args):
-    V_pvalues = r.TH1D("V_pvalues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
-    I_pvalues = r.TH1D("Ileak_pvalues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
+    V_pvalues = r.TH1D("V_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
+    I_pvalues = r.TH1D("Ileak_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
 
-    V_slopes = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 100, 0.99, 1.01)
-    I_slopes = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 100, 0.0, 0.50)
+    V_slopes = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 200, 0.99, 1.01)
+    I_slopes = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 200, 0.0, 0.50)
 
-    V_slopes_rel = r.TH1D("V_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
-    I_slopes_rel = r.TH1D("Ileak_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
+    V_slopes_rel = r.TH1D("V_slopes_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 2.e-4)
+    I_slopes_rel = r.TH1D("Ileak_slopes_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 0.4)
 
     h = [V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes, I_slopes_rel]
     for arg in args:
@@ -352,6 +359,6 @@ def main(options, args):
 
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
-    r.gStyle.SetOptStat("ouen")
+    r.gStyle.SetOptStat("ourmen")
     r.gErrorIgnoreLevel = r.kError
     main(*opts())
