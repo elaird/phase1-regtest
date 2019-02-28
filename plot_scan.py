@@ -2,6 +2,7 @@
 
 import optparse, pickle, sys
 import ROOT as r
+r.PyConfig.IgnoreCommandLineOptions = True
 
 
 def results(filename):
@@ -49,22 +50,24 @@ def graphs(inFile, nCh, biasMonLsb, leakLsb):
     return g_voltages, g_currents
 
 
-def fit1(g, f, y0, xMin, xMax, target, iGraph):
+def fit1(g, f, y0, options, target, iGraph):
     dct = {}
-    for ini in [0.0, 20.0, 40.0, 60.0]:
+    nIni = 4
+    for iIni in range(nIni):
+        ini = options.bvMin + iIni * (options.bvMax - options.bvMin) / nIni
         f.SetParameters(y0, ini, 0.15)
-        f.SetParLimits(1, xMin, xMax)
+        f.SetParLimits(1, options.bvMin, options.bvMax)
         g.Fit(f, "q")
 
         prob = f.GetProb()
         dct[prob] = {}
         for iPar in range(3):
             dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-        if 0.2 < prob:
+        if options.thresholdRefit < prob:
             break
 
     best_prob = max(dct.keys())
-    if best_prob < 0.1:
+    if best_prob < options.thresholdWarn:
         print("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, prob))
 
     out = {}
@@ -73,10 +76,10 @@ def fit1(g, f, y0, xMin, xMax, target, iGraph):
     return out
 
 
-def fits(lst, xMin, xMax, target):
+def fits(lst, options, target, h_pValues, h_slopes, h_slopes_rel):
     out = []
 
-    f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", xMin, xMax)
+    f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", options.bvMin, options.bvMax)
     f.SetLineWidth(1)
     for iGraph, g in enumerate(lst):
         n = g.GetN()
@@ -85,7 +88,13 @@ def fits(lst, xMin, xMax, target):
         x = g.GetX()
         y = g.GetY()
 
-        out.append(fit1(g, f, y[0], xMin, xMax, target, iGraph))
+        out.append(fit1(g, f, y[0], options, target, iGraph))
+        res = out[-1]
+        h_pValues.Fill(res[-1])
+        slope = res[2][0]
+        h_slopes.Fill(slope)
+        if slope:
+            h_slopes_rel.Fill(res[2][1] / slope)
     return out
 
 
@@ -187,25 +196,70 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
 
 
 def opts():
-    parser = optparse.OptionParser(usage="usage: %prog [options] PICKLED_FILE")
+    parser = optparse.OptionParser(usage="usage: %prog [options] FILE1 [FILE2 ...]")
+    parser.add_option("--bv-min",
+                      dest="bvMin",
+                      default=0.0,
+                      type="float",
+                      help="minimum of plot x-axis [default %default]")
+    parser.add_option("--bv-max",
+                      dest="bvMax",
+                      default=80.0,
+                      type="float",
+                      help="maximum of plot x-axis [default %default]")
+    parser.add_option("--lsb-factor",
+                      dest="lsbFactor",
+                      default=1.0,
+                      type="float",
+                      metavar="f",
+                      help="multiple of LSB used for uncertainties [default %default]")
+    parser.add_option("--summary-file",
+                      dest="summaryFile",
+                      default="summary.pdf",
+                      metavar="s",
+                      help="summary file [default %default]")
+    parser.add_option("--threshold-warn",
+                      dest="thresholdWarn",
+                      default=0.01,
+                      type="float",
+                      metavar="a",
+                      help="fit probability below which to warn  [default %default]")
+    parser.add_option("--threshold-refit",
+                      dest="thresholdRefit",
+                      default=0.2,
+                      metavar="b",
+                      type="float",
+                      help="fit probability below which to refit [default %default]")
 
     options, args = parser.parse_args()
 
-    if len(args) != 1:
+    if not args:
         parser.print_help()
         sys.exit(" ")
 
-    return options, args[0]
+    return options, args
 
 
-def main(inFile, nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbLeakLsb=0.244, heLeakLsb=0.122):
+def one(inFile, options, V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes, I_slopes_rel):
+    biasMonLsb = 0.01953602  # V / ADC
+
+    final = inFile.split("/")[-1]
+    if final.startswith("HB"):
+        nCh = 64
+        leakLsb = 0.244  # uA / ADC
+    elif final.starswith("HE"):
+        nCh = 48
+        leakLsb = 0.122  # uA / ADC
+    else:
+        sys.exit("Each argument must contain either 'HB' or 'HE'.  Found '%s'" % inFile)
+
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb, hbLeakLsb if inFile.startswith("HB") else heLeakLsb)
+    g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor)
     can = r.TCanvas()
 
-    p_voltages = fits(g_voltages, bvSetMin, bvSetMax, target)
-    p_currents = fits(g_currents, bvSetMin, bvSetMax, target)
+    p_voltages = fits(g_voltages, options, target, V_pValues, V_slopes, V_slopes_rel)
+    p_currents = fits(g_currents, options, target, I_pValues, I_slopes, I_slopes_rel)
 
     if not p_voltages:
         return
@@ -219,7 +273,42 @@ def main(inFile, nCh=64, bvSetMin=0.0, bvSetMax=80.0, biasMonLsb=0.01953602, hbL
     print("Wrote %s" % outFile)
 
 
+def draw_summary(outFile, lst):
+    can = r.TCanvas()
+    can.Print(outFile + "[")
+    can.SetTickx()
+    can.SetTicky()
+    can.SetLogy()
+
+    for h in lst:
+        h.Draw()
+        h.SetMinimum(0.5)
+        can.Print(outFile)
+
+    can.Print(outFile + "]")
+    print("Wrote %s" % outFile)
+
+
+def main(options, args):
+    V_pValues = r.TH1D("V_pValues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
+    I_pValues = r.TH1D("Ileak_pValues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
+
+    V_slopes  = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 100, 0.99, 1.01)
+    I_slopes  = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 100, 0.0, 0.50)
+
+    V_slopes_rel  = r.TH1D("V_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
+    I_slopes_rel  = r.TH1D("Ileak_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
+
+    h = [V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes, I_slopes_rel]
+    for arg in args:
+        one(arg, options, *h)
+
+    if 2 <= len(args):
+        draw_summary(options.summaryFile, h)
+
+
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
-    r.gErrorIgnoreLevel = r.kError    
-    main(opts()[1])
+    r.gStyle.SetOptStat("ouen")
+    r.gErrorIgnoreLevel = r.kError
+    main(*opts())
