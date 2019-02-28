@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import optparse, pickle, sys
+import printer
 import ROOT as r
 r.PyConfig.IgnoreCommandLineOptions = True
 
@@ -63,12 +64,10 @@ def fit1(g, f, y0, options, target, iGraph):
         dct[prob] = {}
         for iPar in range(3):
             dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-        if options.thresholdRefit < prob:
+        if options.threshold_pvalue_refit < prob:
             break
 
     best_prob = max(dct.keys())
-    if best_prob < options.thresholdWarn:
-        print("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, prob))
 
     out = {}
     out[-1] = best_prob
@@ -76,25 +75,32 @@ def fit1(g, f, y0, options, target, iGraph):
     return out
 
 
-def fits(lst, options, target, h_pValues, h_slopes, h_slopes_rel):
+def fits(lst, options, target, h_pvalues, h_slopes, h_slopes_rel, warn=True):
     out = []
 
     f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", options.bvMin, options.bvMax)
     f.SetLineWidth(1)
     for iGraph, g in enumerate(lst):
-        n = g.GetN()
-        if not n:
+        if not g.GetN():
             continue
-        x = g.GetX()
-        y = g.GetY()
+        out.append(fit1(g, f, g.GetY()[0], options, target, iGraph))
 
-        out.append(fit1(g, f, y[0], options, target, iGraph))
         res = out[-1]
-        h_pValues.Fill(res[-1])
+        pvalue = res[-1]
+        h_pvalues.Fill(pvalue)
+        if warn and pvalue < options.threshold_pvalue_warn:
+            printer.red("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, pvalue))
+
         slope = res[2][0]
         h_slopes.Fill(slope)
+        if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
+            printer.purple("WARNING: fit slope %g" % slope)
+
         if slope:
-            h_slopes_rel.Fill(res[2][1] / slope)
+            rel_unc = res[2][1] / slope
+            h_slopes_rel.Fill(rel_unc)
+            if warn and options.threshold_rel_unc_warn < rel_unc:
+                printer.cyan("WARNING: fit rel unc %g" % rel_unc)
     return out
 
 
@@ -218,16 +224,34 @@ def opts():
                       default="summary.pdf",
                       metavar="s",
                       help="summary file [default %default]")
-    parser.add_option("--threshold-warn",
-                      dest="thresholdWarn",
-                      default=0.01,
+    parser.add_option("--threshold-rel-unc-warn",
+                      dest="threshold_rel_unc_warn",
+                      default=0.1,
                       type="float",
-                      metavar="a",
-                      help="fit probability below which to warn  [default %default]")
-    parser.add_option("--threshold-refit",
-                      dest="thresholdRefit",
+                      metavar="x",
+                      help="rel unc above which to warn  [default %default]")
+    parser.add_option("--threshold-slope-lo-warn",
+                      dest="threshold_slope_lo_warn",
+                      default=0.11,
+                      type="float",
+                      metavar="x",
+                      help="slope below which to warn  [default %default]")
+    parser.add_option("--threshold-slope-hi-warn",
+                      dest="threshold_slope_hi_warn",
                       default=0.2,
-                      metavar="b",
+                      type="float",
+                      metavar="x",
+                      help="slope above which to warn  [default %default]")
+    parser.add_option("--threshold-pvalue-warn",
+                      dest="threshold_pvalue_warn",
+                      default=0.2,
+                      type="float",
+                      metavar="x",
+                      help="fit probability below which to warn  [default %default]")
+    parser.add_option("--threshold-pvalue-refit",
+                      dest="threshold_pvalue_refit",
+                      default=0.2,
+                      metavar="x",
                       type="float",
                       help="fit probability below which to refit [default %default]")
 
@@ -240,7 +264,7 @@ def opts():
     return options, args
 
 
-def one(inFile, options, V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes, I_slopes_rel):
+def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes, I_slopes_rel):
     biasMonLsb = 0.01953602  # V / ADC
 
     final = inFile.split("/")[-1]
@@ -258,8 +282,8 @@ def one(inFile, options, V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes,
     g_voltages, g_currents = graphs(inFile, nCh, biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor)
     can = r.TCanvas()
 
-    p_voltages = fits(g_voltages, options, target, V_pValues, V_slopes, V_slopes_rel)
-    p_currents = fits(g_currents, options, target, I_pValues, I_slopes, I_slopes_rel)
+    p_voltages = fits(g_voltages, options, target, V_pvalues, V_slopes, V_slopes_rel, warn=False)
+    p_currents = fits(g_currents, options, target, I_pvalues, I_slopes, I_slopes_rel)
 
     if not p_voltages:
         return
@@ -270,19 +294,38 @@ def one(inFile, options, V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes,
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
     histogram_fit_results(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
     can.Print(outFile + "]")
-    print("Wrote %s" % outFile)
+    printer.gray("Wrote %s" % outFile)
 
 
-def draw_summary(outFile, lst):
+def draw_summary(options, lst):
+    outFile = options.summaryFile
+
     can = r.TCanvas()
     can.Print(outFile + "[")
     can.SetTickx()
     can.SetTicky()
     can.SetLogy()
 
+    line = r.TLine()
+    line.SetLineColor(r.kMagenta)
+
     for h in lst:
         h.Draw()
         h.SetMinimum(0.5)
+
+        if h.GetName().startswith("Ileak"):
+            xs = []
+            if "_rel" in h.GetName():
+                xs = [options.threshold_rel_unc_warn]
+            elif "pvalue" in h.GetName():
+                xs = [options.threshold_pvalue_warn]
+            else:
+                xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
+
+            keep = []
+            for x in xs:
+                keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
+
         can.Print(outFile)
 
     can.Print(outFile + "]")
@@ -290,21 +333,21 @@ def draw_summary(outFile, lst):
 
 
 def main(options, args):
-    V_pValues = r.TH1D("V_pValues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
-    I_pValues = r.TH1D("Ileak_pValues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
+    V_pvalues = r.TH1D("V_pvalues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
+    I_pvalues = r.TH1D("Ileak_pvalues", ";fit p-value;channels / bin", 101, 0.0, 1.01)
 
-    V_slopes  = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 100, 0.99, 1.01)
-    I_slopes  = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 100, 0.0, 0.50)
+    V_slopes = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 100, 0.99, 1.01)
+    I_slopes = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 100, 0.0, 0.50)
 
-    V_slopes_rel  = r.TH1D("V_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
-    I_slopes_rel  = r.TH1D("Ileak_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
+    V_slopes_rel = r.TH1D("V_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
+    I_slopes_rel = r.TH1D("Ileak_slopes_rel", ";rel. unc. on fit slope;channels / bin", 110, 0.0, 1.1)
 
-    h = [V_pValues, V_slopes, V_slopes_rel, I_pValues, I_slopes, I_slopes_rel]
+    h = [V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes, I_slopes_rel]
     for arg in args:
         one(arg, options, *h)
 
     if 2 <= len(args):
-        draw_summary(options.summaryFile, h)
+        draw_summary(options, h)
 
 
 if __name__ == "__main__":
