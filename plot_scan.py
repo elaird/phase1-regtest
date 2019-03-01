@@ -104,7 +104,7 @@ def fits2_1(g, f, p1_ini, options, target, iGraph):
     return out
 
 
-def fits2(lst, options, target, p1_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
+def fits2(lst, options, target, p1_ini, h_pvalues, h_offsets, h_offsets_unc, h_slopes, h_slopes_unc_rel, warn=True):
     out = []
 
     f = r.TF1("f", "[0] + [1]*x", options.bvMin, options.bvMax)
@@ -121,6 +121,9 @@ def fits2(lst, options, target, p1_ini, h_pvalues, h_slopes, h_slopes_rel, warn=
         if warn and pvalue < options.threshold_pvalue_warn:
             printer.red("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, pvalue))
 
+        h_offsets.Fill(res[0][0])
+        h_offsets_unc.Fill(res[0][1])
+
         slope = res[1][0]
         h_slopes.Fill(slope)
         if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
@@ -128,7 +131,7 @@ def fits2(lst, options, target, p1_ini, h_pvalues, h_slopes, h_slopes_rel, warn=
 
         if slope:
             rel_unc = res[1][1] / slope
-            h_slopes_rel.Fill(rel_unc)
+            h_slopes_unc_rel.Fill(rel_unc)
             if warn and options.threshold_rel_unc_warn < rel_unc:
                 printer.cyan("WARNING: fit rel unc %g" % rel_unc)
     return out
@@ -329,7 +332,9 @@ def opts():
     return options, args
 
 
-def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes, I_slopes_rel):
+def one(inFile, options,
+        V_pvalues, V_offsets, V_offsets_unc, V_slopes, V_slopes_unc_rel,
+        I_pvalues, I_offsets, I_offsets_unc, I_slopes, I_slopes_unc_rel):
     biasMonLsb = 0.01953602  # V / ADC
 
     final = inFile.split("/")[-1]
@@ -352,10 +357,8 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
 
     can = r.TCanvas()
 
-    # p_voltages = fits3(g_voltages, options, target, biasMin,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
-    # p_currents = fits3(g_currents, options, target, leakMin, 0.15, I_pvalues, I_slopes, I_slopes_rel)
-    p_voltages = fits2(g_voltages, options, target,  1.0, V_pvalues, V_slopes, V_slopes_rel, warn=False)
-    p_currents = fits2(g_currents, options, target, 0.15, I_pvalues, I_slopes, I_slopes_rel)
+    p_voltages = fits2(g_voltages, options, target,  1.0, V_pvalues, V_offsets, V_offsets_unc, V_slopes, V_slopes_unc_rel, warn=False)
+    p_currents = fits2(g_currents, options, target, 0.15, I_pvalues, I_offsets, I_offsets_unc, I_slopes, I_slopes_unc_rel)
 
     if not p_voltages:
         return
@@ -374,18 +377,23 @@ def draw_summary(options, lst):
 
     can = r.TCanvas()
     can.Print(outFile + "[")
-    can.SetTickx()
-    can.SetTicky()
+    nPads = len(lst) // 2
+    can.DivideSquare(nPads)
 
     line = r.TLine()
     line.SetLineColor(r.kMagenta)
     line.SetLineStyle(2)
 
-    for h in lst:
+    keep = []
+    for iH, h in enumerate(lst):
+        can.cd(1 + (iH % nPads))
+        r.gPad.SetTickx()
+        r.gPad.SetTicky()
+        r.gPad.SetLogy("pvalue" not in h.GetName())
+
         h.Draw()
         h.SetLineWidth(2)
         h.SetMinimum(0.5)
-        can.SetLogy("pvalue" not in h.GetName())
 
         if h.GetName().startswith("Ileak"):
             xs = []
@@ -393,14 +401,14 @@ def draw_summary(options, lst):
                 xs = [options.threshold_rel_unc_warn]
             elif "pvalue" in h.GetName():
                 xs = [options.threshold_pvalue_warn]
-            else:
+            elif "slope" in h.GetName():
                 xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
 
-            keep = []
             for x in xs:
                 keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
 
-        can.Print(outFile)
+        if (iH % nPads) == (nPads - 1) or iH == len(lst) - 1:
+            can.Print(outFile)
 
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
@@ -410,13 +418,20 @@ def main(options, args):
     V_pvalues = r.TH1D("V_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
     I_pvalues = r.TH1D("Ileak_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
 
+    V_offsets = r.TH1D("V_offsets", ";fit offset (V);channels / bin", 200, -0.2, 0.2)
+    I_offsets = r.TH1D("Ileak_offsets", ";fit offset (uA);channels / bin", 200, -50.0, 50.0)
+
+    V_offsets_unc = r.TH1D("V_offsets_unc", ";uncertainty on fit offset (V);channels / bin", 200, 0.0, 0.02)
+    I_offsets_unc = r.TH1D("Ileak_offsets_unc", ";uncertainty on fit offset (uA);channels / bin", 200, 0.0, 1.0)
+
     V_slopes = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 200, 0.99, 1.01)
     I_slopes = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 200, 0.0, 0.50)
 
-    V_slopes_rel = r.TH1D("V_slopes_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 2.e-4)
-    I_slopes_rel = r.TH1D("Ileak_slopes_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 0.4)
+    V_slopes_unc_rel = r.TH1D("V_slopes_unc_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 2.e-4)
+    I_slopes_unc_rel = r.TH1D("Ileak_slopes_unc_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 0.4)
 
-    h = [V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes, I_slopes_rel]
+    h = [V_pvalues, V_offsets, V_offsets_unc, V_slopes, V_slopes_unc_rel,
+         I_pvalues, I_offsets, I_offsets_unc, I_slopes, I_slopes_unc_rel]
     for arg in args:
         one(arg, options, *h)
 
@@ -425,6 +440,6 @@ def main(options, args):
 
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
-    r.gStyle.SetOptStat("ourmen")
+    r.gStyle.SetOptStat("ourme")
     r.gErrorIgnoreLevel = r.kError
     main(*opts())
