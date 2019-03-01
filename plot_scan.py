@@ -54,53 +54,16 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
     return g_voltages, g_currents
 
 
-def fit3_1(g, f, p0_ini, p2_ini, options, target, iGraph, fix_p0=True):
-    dct = {}
-    for factor in [0.0, 0.5, -0.5, 1.0, -1.0]:
-        p1_ini = options.bvMin + factor * (options.bvMax - options.bvMin)
-        if fix_p0:
-            f.SetParameters(p0_ini, p1_ini, p2_ini)
-            f.FixParameter(0, p0_ini)
-        else:
-            f.SetParameters(p0_ini, p1_ini, p2_ini)
-            f.SetParLimits(1, options.bvMin, options.bvMax)
-
-        g.Fit(f, "q")
-
-        prob = f.GetProb()
-        dct[prob] = {}
-        for iPar in range(3):
-            dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-        if options.threshold_pvalue_refit < prob:
-            break
-
-    best_prob = max(dct.keys())
-
-    out = {}
-    out[-1] = best_prob
-    out.update(dct[best_prob])
-    return out
-
-
 def fits2_1(g, f, p1_ini, options, target, iGraph):
-    dct = {}
-    for factor in [0.0, 0.5, -0.5, 1.0, -1.0]:
-        p0_ini = options.bvMin + factor * (options.bvMax - options.bvMin)
-        f.SetParameters(p0_ini, p1_ini)
-        g.Fit(f, "q")
-
-        prob = f.GetProb()
-        dct[prob] = {}
-        for iPar in range(2):
-            dct[prob][iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-        if options.threshold_pvalue_refit < prob:
-            break
-
-    best_prob = max(dct.keys())
-
     out = {}
-    out[-1] = best_prob
-    out.update(dct[best_prob])
+
+    f.SetParameters(0.0, p1_ini)
+    g.Fit(f, "q")
+
+    out[-1] = f.GetProb()
+    for iPar in range(2):
+        out[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+
     return out
 
 
@@ -132,36 +95,6 @@ def fits2(lst, options, target, p1_ini, h_pvalues, h_offsets, h_offsets_unc, h_s
         if slope:
             rel_unc = res[1][1] / slope
             h_slopes_unc_rel.Fill(rel_unc)
-            if warn and options.threshold_rel_unc_warn < rel_unc:
-                printer.cyan("WARNING: fit rel unc %g" % rel_unc)
-    return out
-
-
-def fits3(lst, options, target, p0_ini, p2_ini, h_pvalues, h_slopes, h_slopes_rel, warn=True):
-    out = []
-
-    f = r.TF1("f", "[0] + (x<[1]?0.0:[2]*(x-[1]))", options.bvMin, options.bvMax)
-    f.SetLineWidth(1)
-    for iGraph, g in enumerate(lst):
-        if not g.GetN():
-            continue
-
-        out.append(fits3_1(g, f, p0_ini, p2_ini, options, target, iGraph))
-
-        res = out[-1]
-        pvalue = res[-1]
-        h_pvalues.Fill(pvalue)
-        if warn and pvalue < options.threshold_pvalue_warn:
-            printer.red("WARNING: %s graph %d has fit prob. %e" % (target, 1 + iGraph, pvalue))
-
-        slope = res[2][0]
-        h_slopes.Fill(slope)
-        if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
-            printer.purple("WARNING: fit slope %g" % slope)
-
-        if slope:
-            rel_unc = res[2][1] / slope
-            h_slopes_rel.Fill(rel_unc)
             if warn and options.threshold_rel_unc_warn < rel_unc:
                 printer.cyan("WARNING: fit rel unc %g" % rel_unc)
     return out
@@ -316,12 +249,6 @@ def opts():
                       type="float",
                       metavar="x",
                       help="fit probability below which to warn  [default %default]")
-    parser.add_option("--threshold-pvalue-refit",
-                      dest="threshold_pvalue_refit",
-                      default=0.01,
-                      metavar="x",
-                      type="float",
-                      help="fit probability below which to refit [default %default]")
 
     options, args = parser.parse_args()
 
