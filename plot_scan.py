@@ -30,7 +30,7 @@ def vi_dicts(inFile):
     return voltage, current
 
 
-def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
+def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
     g_voltages = []
     g_currents = []
     for iCh in range(nCh):
@@ -42,11 +42,11 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
         for iCh in range(nCh):
-            if biasMin < voltages[iCh]:
+            if biasMin < voltages[iCh] and options.bvMin <= setting <= options.bvMax:
                 iPoint = g_voltages[iCh].GetN()
                 g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
                 g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
-            if leakMin < currents[iCh]:
+            if leakMin < currents[iCh] and options.bvMin <= setting <= options.bvMax:
                 iPoint = g_currents[iCh].GetN()
                 g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
                 g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
@@ -218,8 +218,8 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
     else:
         # yMin = {-1: 0.0, 0:  0.0, 1:-80.0, 2:-0.15}
         # yMax = {-1: 1.1, 0: 10.0, 1: 80.0, 2: 0.35}
-        yMin = {-1: 0.0, 0:-20.0, 1:-0.15}
-        yMax = {-1: 1.1, 0: 20.0, 1: 0.35}
+        yMin = {-1: 0.0, 0:-20.0, 1: 0.00}
+        yMax = {-1: 1.1, 0: 20.0, 1: 0.50}
 
     # par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
     par_name = {-1: "fit probability", 0:"fit offset (%s)" % unit, 1:"fit slope (%s / V)" % unit}
@@ -348,7 +348,7 @@ def one(inFile, options, V_pvalues, V_slopes, V_slopes_rel, I_pvalues, I_slopes,
     target = inFile.replace(".pickle", "")
     g_voltages, g_currents = graphs(inFile, nCh,
                                     biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
-                                    biasMin*1.001, leakMin*1.001)
+                                    biasMin*1.001, leakMin*1.001, options)
 
     can = r.TCanvas()
 
