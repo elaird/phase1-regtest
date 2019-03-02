@@ -30,47 +30,50 @@ def vi_dicts(inFile):
     return voltage, current
 
 
-def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
+def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
     g_voltages   = []
     min_voltages = []
-    max_voltages = []
 
     g_currents   = []
     min_currents = []
-    max_currents = []
     for iCh in range(nCh):
         g_voltages.append(r.TGraphErrors())
+        min_voltages.append(None)
         g_currents.append(r.TGraphErrors())
+        min_currents.append(None)
 
     d_voltages, d_currents = vi_dicts(inFile)
     for setting in sorted(d_voltages.keys()):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
         for iCh in range(nCh):
-            if biasMin < voltages[iCh] and options.bvMin <= setting <= options.bvMax:
-                iPoint = g_voltages[iCh].GetN()
-                g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
-                g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
-            if leakMin < currents[iCh] and options.bvMin <= setting <= options.bvMax:
-                iPoint = g_currents[iCh].GetN()
-                g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
-                g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
+            iPoint = g_voltages[iCh].GetN()
+            g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
+            g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
+            if biasMin < voltages[iCh] and min_voltages[iCh] is None:
+                min_voltages[iCh] = setting
 
-    return g_voltages, min_voltages, max_voltages, g_currents, min_currents, max_currents
+            iPoint = g_currents[iCh].GetN()
+            g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
+            g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
+            if leakMin < currents[iCh] and min_currents[iCh] is None:
+                min_currents[iCh] = setting
+
+    return g_voltages, min_voltages, g_currents, min_currents
 
 
-def fits(lst, mins, maxs, options, target, p1_ini):
+def fits(lst, mins, options, target, p1_ini):
     out = []
 
-    f = r.TF1("f", "pol2", options.bvMin, options.bvMax)
     for iGraph, g in enumerate(lst):
         nPoints = g.GetN()
         if not nPoints:
             continue
 
+        f = r.TF1("f", "pol2", max(mins[iGraph], options.bvMin), options.bvMax)
         f.SetParameters(0.0, p1_ini, 0.0)
         f.FixParameter(2, 0.0)
-        g.Fit(f, "efq0")
+        g.Fit(f, "refq0")
 
         res = {-3: nPoints, -2: f.GetChisquare(), -1: f.GetProb(),}
         for iPar in range(3):
@@ -294,13 +297,13 @@ def one(inFile, options, h):
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, min_voltages, max_voltages,\
-    g_currents, min_currents, max_currents = graphs(inFile, nCh,
-                                                    biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
-                                                    biasMin*1.001, leakMin*1.001, options)
+    g_voltages, min_voltages,\
+    g_currents, min_currents = graphs(inFile, nCh,
+                                      biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
+                                      biasMin*1.001, leakMin*1.001)
 
-    p_voltages = fits(g_voltages, min_voltages, max_voltages, options, target,  1.0)
-    p_currents = fits(g_currents, min_currents, max_currents, options, target, 0.15)
+    p_voltages = fits(g_voltages, min_voltages, options, target,  1.0)
+    p_currents = fits(g_currents, min_currents, options, target, 0.15)
 
     if not p_voltages:
         return
