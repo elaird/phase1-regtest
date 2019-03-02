@@ -96,7 +96,7 @@ def fits(lst, mins, options, target, p1_ini):
 
 def histogram_fit_results(lst, options, target, h_npoints,
                           h_pvalues, h_pvalues2,
-                          h_pvalues_vs_ch, h_delta_chi2,
+                          h_delta_chi2, h_delta_chi2_cut_vs_ch,
                           h_offsets, h_offsets_unc,
                           h_slopes, h_slopes_unc_rel,
                           warn=True):
@@ -112,15 +112,16 @@ def histogram_fit_results(lst, options, target, h_npoints,
 
         pvalue = res[-1]
         h_pvalues.Fill(pvalue)
-        h_pvalues_vs_ch.Fill(ch, pvalue)
 
         pvalue2 = res2[-1]
         h_pvalues2.Fill(pvalue2)
 
         delta_chi2 = res[-2] - res2[-2]
         h_delta_chi2.Fill(delta_chi2)
-        if warn and options.threshold_delta_chi2_warn < delta_chi2:
-            printer.dark_blue("%s has delta chi2 %e" % (s, delta_chi2))
+        if options.threshold_delta_chi2_warn < delta_chi2:
+            h_delta_chi2_cut_vs_ch.Fill(ch)
+            if warn:
+                printer.dark_blue("%s has delta chi2 %e" % (s, delta_chi2))
 
         h_offsets.Fill(res[0][0])
         h_offsets_unc.Fill(res[0][1])
@@ -205,11 +206,11 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
         yMax = {-3: 100, -1: 1.1, 0: 20.0, 1: 0.50, 2: 0.01}
 
     for iPar, par_name in [(-3, "number of fit points"),
-                           (-1, "fit probability"),
+                           (-1, "fit1 p-value"),
                            (-2, "#chi^{2}_{c*} - #chi^{2}_{0}"),
-                           ( 0, "fit offset (%s)" % unit),
-                           ( 1, "fit slope (%s / V)" % unit),
-                           ( 2, "fit curvature (%s / V^{2})" % unit)]:
+                           ( 0, "fit1 offset (%s)" % unit),
+                           ( 1, "fit1 slope (%s / V)" % unit),
+                           ( 2, "fit2 curvature (%s / V^{2})" % unit)]:
 
         h = r.TH1D("h", "%s: %s;QIE channel number;%s" % (target, title, par_name), nCh, 0.5, 0.5 + nCh)
         h.SetStats(False)
@@ -228,11 +229,11 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
             elif iPar < 0:
                 h.SetBinContent(iBin, res[iPar])
             else:
-                c, e = res[iPar]
+                c, e = (res2 if iPar == 2 else res)[iPar]
                 h.SetBinContent(iBin, c)
                 h.SetBinError(iBin, e)
 
-        h.Draw("pe" if 0 <=iPar else "p")
+        h.Draw("pe" if 0 <= iPar else "p")
         if iPar in yMin and iPar in yMax:
             h.GetYaxis().SetRangeUser(yMin[iPar], yMax[iPar])
         can.Print(outFile)
@@ -348,7 +349,7 @@ def one(inFile, options, h):
     histogram_fit_results(p_voltages, options, target,
                           h["V_npoints"],
                           h["V_pvalues"], h["V_pvalues2"],
-                          h["V_pvalues_vs_ch"], h["V_delta_chi2"],
+                          h["V_delta_chi2"], h["V_delta_chi2_cut_vs_ch"],
                           h["V_offsets"], h["V_offsets_unc"],
                           h["V_slopes"], h["V_slopes_unc_rel"],
                           warn=False)
@@ -358,7 +359,7 @@ def one(inFile, options, h):
     histogram_fit_results(p_currents, options, target,
                           h["I_npoints"],
                           h["I_pvalues"], h["I_pvalues2"],
-                          h["I_pvalues_vs_ch"], h["I_delta_chi2"],
+                          h["I_delta_chi2"], h["I_delta_chi2_cut_vs_ch"],
                           h["I_offsets"], h["I_offsets_unc"],
                           h["I_slopes"], h["I_slopes_unc_rel"])
 
@@ -368,16 +369,9 @@ def one(inFile, options, h):
     return True
 
 
-def draw_summary(options, hs):
-    outFile = options.summaryFile
-
-    keys = ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2", "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel",
-            "I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2", "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel"]
-
-    can = r.TCanvas()
-    can.Print(outFile + "[")
-
+def multi_panel(options, hs, can, outFile, keys):
     nPads = 4
+    can.Clear()
     can.DivideSquare(nPads)
 
     line = r.TLine()
@@ -410,28 +404,54 @@ def draw_summary(options, hs):
 
         if (iH % nPads) == (nPads - 1) or iH == len(keys) - 1:
             can.Print(outFile)
+    can.cd(0)
+    can.Divide(1, 1)
+    can.Clear()
+
+
+def draw_summary(options, hs):
+    outFile = options.summaryFile
+
+    can = r.TCanvas()
+    can.SetTickx()
+    can.SetTicky()
+    can.Print(outFile + "[")
+
+    multi_panel(options, hs, can, outFile,
+                ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2", "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel"])
+
+    multi_panel(options, hs, can, outFile,
+                ["I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2", "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel"])
+
+    h = hs["I_delta_chi2_cut_vs_ch"]
+    h.SetBinErrorOption(r.TH1.kPoisson)
+    h.Draw("e0p")
+    h.SetLineWidth(2)
+    h.SetMarkerStyle(20)
+    h.SetMarkerColor(h.GetLineColor())
+    can.Print(outFile)
 
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
 
 
-def histos():
+def histos(threshold_delta_chi2_warn):
     nCh = 64  # FIXME
     out = {}
     nPoints = 100
-    nChi2 = 110
+    nChi2 = 201
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "I_npoints": ("I;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "V_pvalues": ("V;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues": ("I;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues2": ("V;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues2": ("I;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
-                        "V_pvalues_vs_ch": ("V;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
-                        "I_pvalues_vs_ch": ("I;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
                         "V_chi2": ("V;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
                         "I_chi2": ("I;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
-                        "V_delta_chi2": ("V;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
-                        "I_delta_chi2": ("I;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
+                        "V_delta_chi2": ("V;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -1.0, 200.0)),
+                        "I_delta_chi2": ("I;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -1.0, 200.0)),
+                        "V_delta_chi2_cut_vs_ch": ("V (%g < #chi^{2}_{c*} - #chi^{2}_{0});QIE channel number;channels / bin" % threshold_delta_chi2_warn, (nCh, 0.5, 0.5 + nCh)),
+                        "I_delta_chi2_cut_vs_ch": ("I (%g < #chi^{2}_{c*} - #chi^{2}_{0});QIE channel number;channels / bin" % threshold_delta_chi2_warn, (nCh, 0.5, 0.5 + nCh)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.02)),
@@ -449,7 +469,7 @@ def histos():
 
 
 def main(options, args):
-    h = histos()
+    h = histos(options.threshold_delta_chi2_warn)
     codes = []
     for arg in args:
         codes.append(one(arg, options, h))
