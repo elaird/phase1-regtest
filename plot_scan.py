@@ -90,19 +90,18 @@ def fits(lst, mins, options, target, p1_ini):
         f2.SetParameters(0.0, p1_ini, 0.0)
         g.Fit(f2, "%s+" % fops)
 
-        out.append(fit_results(f1))
-        out[-1][-4] = out[-1][-2] - fit_results(f2)[-2]  # delta chi2 between the two fits
+        out.append((fit_results(f1), fit_results(f2)))
     return out
 
 
 def histogram_fit_results(lst, options, target, h_npoints,
-                          h_pvalues, h_pvalues_vs_ch,
-                          h_chi2, h_delta_chi2,
+                          h_pvalues, h_pvalues2,
+                          h_pvalues_vs_ch, h_delta_chi2,
                           h_offsets, h_offsets_unc,
                           h_slopes, h_slopes_unc_rel,
                           warn=True):
 
-    for iRes, res in enumerate(lst):
+    for iRes, (res, res2) in enumerate(lst):
         ch = 1 + iRes
         s = "WARNING: %s graph %2d" % (target, ch)
 
@@ -114,15 +113,11 @@ def histogram_fit_results(lst, options, target, h_npoints,
         pvalue = res[-1]
         h_pvalues.Fill(pvalue)
         h_pvalues_vs_ch.Fill(ch, pvalue)
-        if warn and pvalue < options.threshold_pvalue_warn:
-            printer.dark_blue("%s has fit prob   %e" % (s, pvalue))
 
-        chi2 = res[-2]
-        h_chi2.Fill(chi2)
-        if warn and options.threshold_chi2_warn < chi2:
-            printer.dark_blue("%s has chi2       %e" % (s, chi2))
+        pvalue2 = res2[-1]
+        h_pvalues2.Fill(pvalue2)
 
-        delta_chi2 = res[-4]
+        delta_chi2 = res[-2] - res2[-2]
         h_delta_chi2.Fill(delta_chi2)
         if warn and options.threshold_delta_chi2_warn < delta_chi2:
             printer.dark_blue("%s has delta chi2 %e" % (s, delta_chi2))
@@ -146,7 +141,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
     can.Clear()
     can.DivideSquare(len(lst), 0.003, 0.001)
     
-    null = r.TH2D("null", ";BVset(V);%s" % yTitle, 1, 0.0, 80.0, 1, 0.0, yMax)
+    null = r.TH2D("null", ";BVset(V) ;%s" % yTitle, 1, 0.0, 80.0, 1, 0.0, yMax)
     null.SetStats(False)
 
     x = null.GetXaxis()
@@ -171,7 +166,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
         r.gPad.SetTickx()
         r.gPad.SetTicky()
         null.Draw()
-        keep.append(text.DrawText(0.45, 0.7, "QIECh%d" % (1 + iCh)))
+        keep.append(text.DrawText(0.28, 0.75, "QIECh%d" % (1 + iCh)))
 
         g = lst[iCh]
         f2 = g.GetFunction("f2")
@@ -193,7 +188,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
     can.Print(outFile)
 
 
-def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, do_corr=False):
+def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
     if not d:
         return
 
@@ -211,8 +206,7 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, 
 
     for iPar, par_name in [(-3, "number of fit points"),
                            (-1, "fit probability"),
-                           (-2, "fit #chi^{2}"),
-                           (-4, "#chi^{2}_{c*} - #chi^{2}_{0}"),
+                           (-2, "#chi^{2}_{c*} - #chi^{2}_{0}"),
                            ( 0, "fit offset (%s)" % unit),
                            ( 1, "fit slope (%s / V)" % unit),
                            ( 2, "fit curvature (%s / V^{2})" % unit)]:
@@ -227,40 +221,21 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, 
             h.GetYaxis().SetTitleOffset(1.5)
 
         for iCh in range(nCh):
+            res, res2 = d[iCh]
             iBin = h.GetBin(1 + iCh)
-            if iPar < 0:
-                h.SetBinContent(iBin, d[iCh][iPar])
+            if iPar == -2:
+                h.SetBinContent(iBin, res[iPar] - res2[iPar])
+            elif iPar < 0:
+                h.SetBinContent(iBin, res[iPar])
             else:
-                c, e = d[iCh][iPar]
+                c, e = res[iPar]
                 h.SetBinContent(iBin, c)
                 h.SetBinError(iBin, e)
+
         h.Draw("pe" if 0 <=iPar else "p")
         if iPar in yMin and iPar in yMax:
             h.GetYaxis().SetRangeUser(yMin[iPar], yMax[iPar])
         can.Print(outFile)
-
-    if not do_corr:
-        return
-
-    # FIXME
-    null = r.TH2D("h2", "%s;%s;%s;" % (full_title, par_name[0], par_name[1]), 1, yMin[0], yMax[0], 1, yMin[1], yMax[1])
-    null.SetStats(False)
-
-    corr = r.TGraphErrors()
-    corr.SetLineColor(h.GetLineColor())
-    corr.SetMarkerColor(h.GetMarkerColor())
-    corr.SetMarkerStyle(h.GetMarkerStyle())
-    corr.SetMarkerSize(h.GetMarkerSize())
-
-    for iCh in range(nCh):
-        x, xe = d[iCh][0]
-        y, ye = d[iCh][1]
-        corr.SetPoint(iCh, x, y)
-        corr.SetPointError(iCh, xe, ye)
-
-    null.Draw()
-    corr.Draw("psame")
-    can.Print(outFile)
 
 
 def opts():
@@ -298,15 +273,9 @@ def opts():
                       default="summary.pdf",
                       metavar="s",
                       help="summary file [default %default]")
-    parser.add_option("--threshold-chi2-warn",
-                      dest="threshold_chi2_warn",
-                      default=50.0,
-                      type="float",
-                      metavar="x",
-                      help="chi2 above which to warn  [default %default]")
     parser.add_option("--threshold-delta-chi2-warn",
                       dest="threshold_delta_chi2_warn",
-                      default=16.0,
+                      default=20.0,
                       type="float",
                       metavar="x",
                       help="delta chi2 above which to warn  [default %default]")
@@ -334,12 +303,6 @@ def opts():
                       type="float",
                       metavar="x",
                       help="slope above which to warn  [default %default]")
-    parser.add_option("--threshold-pvalue-warn",
-                      dest="threshold_pvalue_warn",
-                      default=0.005,
-                      type="float",
-                      metavar="x",
-                      help="fit probability below which to warn  [default %default]")
 
     options, args = parser.parse_args()
 
@@ -384,31 +347,32 @@ def one(inFile, options, h):
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor1=r.kBlue+3, fColor2=r.kCyan)
     histogram_fit_results(p_voltages, options, target,
                           h["V_npoints"],
-                          h["V_pvalues"], h["V_pvalues_vs_ch"],
-                          h["V_chi2"], h["V_delta_chi2"],
+                          h["V_pvalues"], h["V_pvalues2"],
+                          h["V_pvalues_vs_ch"], h["V_delta_chi2"],
                           h["V_offsets"], h["V_offsets_unc"],
                           h["V_slopes"], h["V_slopes_unc_rel"],
                           warn=False)
     # histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
-
-    draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
+                          
+    draw_per_channel(g_currents, "Ileak(uA) ", 40.0, can, outFile)
     histogram_fit_results(p_currents, options, target,
                           h["I_npoints"],
-                          h["I_pvalues"], h["I_pvalues_vs_ch"],
-                          h["I_chi2"], h["I_delta_chi2"],
+                          h["I_pvalues"], h["I_pvalues2"],
+                          h["I_pvalues_vs_ch"], h["I_delta_chi2"],
                           h["I_offsets"], h["I_offsets_unc"],
                           h["I_slopes"], h["I_slopes_unc_rel"])
 
     histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
     can.Print(outFile + "]")
     printer.gray("Wrote %s" % outFile)
+    return True
 
 
 def draw_summary(options, hs):
     outFile = options.summaryFile
 
-    keys = ["V_pvalues", "V_chi2", "V_npoints", "V_delta_chi2", "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel",
-            "I_pvalues", "I_chi2", "I_npoints", "I_delta_chi2", "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel"]
+    keys = ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2", "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel",
+            "I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2", "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel"]
 
     can = r.TCanvas()
     can.Print(outFile + "[")
@@ -436,14 +400,10 @@ def draw_summary(options, hs):
             xs = []
             if "_rel" in h.GetName():
                 xs = [options.threshold_slope_rel_unc_warn]
-            elif h.GetName().endswith("p_values"):
-                xs = [options.threshold_pvalue_warn]
             elif "slope" in h.GetName():
                 xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
             elif "delta_chi2" in h.GetName():
                 xs = [options.threshold_delta_chi2_warn]
-            elif "_chi2" in h.GetName():
-                xs = [options.threshold_chi2_warn]
 
             for x in xs:
                 keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
@@ -462,8 +422,10 @@ def histos():
     nChi2 = 110
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "I_npoints": ("I;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
-                        "V_pvalues": ("V;fit p-value;channels / bin", (202, 0.0, 1.01)),
-                        "I_pvalues": ("I;fit p-value;channels / bin", (202, 0.0, 1.01)),
+                        "V_pvalues": ("V;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
+                        "I_pvalues": ("I;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
+                        "V_pvalues2": ("V;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
+                        "I_pvalues2": ("I;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues_vs_ch": ("V;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
                         "I_pvalues_vs_ch": ("I;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
                         "V_chi2": ("V;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
@@ -488,10 +450,12 @@ def histos():
 
 def main(options, args):
     h = histos()
+    codes = []
     for arg in args:
-        one(arg, options, h)
+        codes.append(one(arg, options, h))
 
-    draw_summary(options, h)
+    if any(codes):
+        draw_summary(options, h)
 
 
 if __name__ == "__main__":
