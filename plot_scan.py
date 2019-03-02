@@ -3,7 +3,6 @@
 import optparse, pickle, sys
 import printer
 import ROOT as r
-r.PyConfig.IgnoreCommandLineOptions = True
 
 
 def results(filename):
@@ -65,6 +64,13 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
     return g_voltages, min_voltages, g_currents, min_currents
 
 
+def fit_results(f):
+    out = {-3: f.GetNumberFitPoints(), -2: f.GetChisquare(), -1: f.GetProb(),}
+    for iPar in range(3):
+        out[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+    return out
+
+
 def fits(lst, mins, options, target, p1_ini):
     out = []
 
@@ -72,15 +78,18 @@ def fits(lst, mins, options, target, p1_ini):
         if not g.GetN():
             continue
 
-        f = r.TF1("f", "pol2", max(mins[iGraph], options.bvMin), options.bvMax)
-        f.SetParameters(0.0, p1_ini, 0.0)
-        f.FixParameter(2, 0.0)
-        g.Fit(f, "refq0")
+        mm = (max(mins[iGraph], options.bvMin), options.bvMax)
+        fops = "refq0"
+        f1 = r.TF1("f1", "pol2", *mm)
+        f1.SetParameters(0.0, p1_ini, 0.0)
+        f1.FixParameter(2, 0.0)
+        g.Fit(f1, fops)
 
-        res = {-3: f.GetNumberFitPoints(), -2: f.GetChisquare(), -1: f.GetProb(),}
-        for iPar in range(3):
-            res[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-        out.append(res)
+        f2 = r.TF1("f2", "pol2", *mm)
+        f2.SetParameters(0.0, p1_ini, 0.0)
+        g.Fit(f2, "%s+" % fops)
+
+        out.append((fit_results(f1), fit_results(f2))[0])
     return out
 
 
@@ -120,7 +129,7 @@ def histogram_fit_results(lst, options, target, h_npoints,
                 printer.cyan("%s has fit rel unc %g" % (s, rel_unc))
 
 
-def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor=r.kRed):
+def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.kGreen):
     can.Clear()
     can.DivideSquare(len(lst), 0.003, 0.001)
     
@@ -151,11 +160,17 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor=r.kRed):
         null.Draw()
         keep.append(text.DrawText(0.45, 0.7, "QIECh%d" % (1 + iCh)))
         g = lst[iCh]
-        f = g.GetFunction("f")
-        f.SetNpx(1000)
-        f.SetLineWidth(1)
-        f.SetLineColor(fColor)
-        f.Draw("same")
+        f2 = g.GetFunction("f2")
+        f2.SetNpx(1000)
+        f2.SetLineWidth(1)
+        f2.SetLineColor(fColor2)
+        f2.Draw("same")
+
+        f1 = g.GetFunction("f1")
+        f1.SetNpx(1000)
+        f1.SetLineWidth(1)
+        f1.SetLineColor(fColor1)
+        f1.Draw("same")
 
         g.SetMarkerStyle(20)
         g.SetMarkerSize(0.3 * g.GetMarkerSize())
@@ -338,7 +353,7 @@ def one(inFile, options, h):
 
     can = r.TCanvas()
     can.Print(outFile + "[")
-    draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor=r.kCyan)
+    draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor1=r.kBlue+3, fColor2=r.kCyan)
     histogram_fit_results(p_voltages, options, target,
                           h["V_npoints"],
                           h["V_pvalues"], h["V_pvalues_vs_ch"],
@@ -442,5 +457,6 @@ def main(options, args):
 if __name__ == "__main__":
     r.gROOT.SetBatch(True)
     r.gStyle.SetOptStat("ourme")
+    r.PyConfig.IgnoreCommandLineOptions = True
     r.gErrorIgnoreLevel = r.kError
     main(*opts())
