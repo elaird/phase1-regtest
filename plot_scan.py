@@ -54,19 +54,6 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
     return g_voltages, g_currents
 
 
-def fits2_1(g, f, p1_ini, options, target, iGraph):
-    out = {}
-
-    f.SetParameters(0.0, p1_ini)
-    g.Fit(f, "q")
-
-    out[-1] = f.GetProb()
-    for iPar in range(2):
-        out[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
-
-    return out
-
-
 def fits2(lst, options, target, p1_ini,
           h_pvalues, h_pvalues_vs_ch,
           h_offsets, h_offsets_unc,
@@ -75,14 +62,19 @@ def fits2(lst, options, target, p1_ini,
     out = []
 
     f = r.TF1("f", "[0] + [1]*x", options.bvMin, options.bvMax)
-    f.SetLineWidth(1)
     for iGraph, g in enumerate(lst):
         if not g.GetN():
             continue
 
-        out.append(fits2_1(g, f, p1_ini, options, target, iGraph))
+        f.SetParameters(0.0, p1_ini)
+        g.Fit(f, "q0")
+
+        res = {-1: f.GetProb()}
+        for iPar in range(f.GetNumberFreeParameters()):
+            res[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
+        out.append(res)
+
         ch = 1 + iGraph
-        res = out[-1]
         pvalue = res[-1]
         h_pvalues.Fill(pvalue)
         h_pvalues_vs_ch.Fill(ch, pvalue)
@@ -105,7 +97,7 @@ def fits2(lst, options, target, p1_ini,
     return out
 
 
-def draw_per_channel(lst, yTitle, yMax, can, outFile):
+def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor=r.kRed):
     can.Clear()
     can.DivideSquare(len(lst), 0.003, 0.001)
     
@@ -136,9 +128,15 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile):
         null.Draw()
         keep.append(text.DrawText(0.45, 0.7, "QIECh%d" % (1 + iCh)))
         g = lst[iCh]
+        f = g.GetFunction("f")
+        f.SetNpx(1000)
+        f.SetLineWidth(1)
+        f.SetLineColor(fColor)
+        f.Draw("same")
+
         g.SetMarkerStyle(20)
         g.SetMarkerSize(0.3 * g.GetMarkerSize())
-        g.Draw("psame")
+        g.Draw("ex0psame")
     can.Print(outFile)
 
 
@@ -152,17 +150,12 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
     can.SetTicky()
 
     if unit == "V":
-        # yMin = {-1: 0.0, 0: 0.0, 1: 0.0, 2:0.99}
-        # yMax = {-1: 1.1, 0: 0.1, 1: 0.4, 2:1.01}
         yMin = {-1: 0.0, 0: 0.0, 1: 0.99}
         yMax = {-1: 1.1, 0: 0.4, 1: 1.01}
     else:
-        # yMin = {-1: 0.0, 0:  0.0, 1:-80.0, 2:-0.15}
-        # yMax = {-1: 1.1, 0: 10.0, 1: 80.0, 2: 0.35}
         yMin = {-1: 0.0, 0:-20.0, 1: 0.00}
         yMax = {-1: 1.1, 0: 20.0, 1: 0.50}
 
-    # par_name = {-1: "fit probability", 0:"fit baseline (%s)" % unit, 1:"fit kink voltage (V)", 2:"fit slope (%s / V)" % unit}
     par_name = {-1: "fit probability", 0:"fit offset (%s)" % unit, 1:"fit slope (%s / V)" % unit}
     full_title = "%s: %s" % (target, title)
 
@@ -292,7 +285,9 @@ def one(inFile, options,
     p_voltages = fits2(g_voltages, options, target,  1.0,
                        V_pvalues, V_pvalues_vs_ch,
                        V_offsets, V_offsets_unc,
-                       V_slopes, V_slopes_unc_rel, warn=False)
+                       V_slopes, V_slopes_unc_rel,
+                       warn=False)
+
     p_currents = fits2(g_currents, options, target, 0.15,
                        I_pvalues, I_pvalues_vs_ch,
                        I_offsets, I_offsets_unc,
@@ -302,7 +297,7 @@ def one(inFile, options,
         return
 
     can.Print(outFile + "[")
-    draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile)
+    draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor=r.kCyan)
     # histogram_fit_results(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
     histogram_fit_results(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
