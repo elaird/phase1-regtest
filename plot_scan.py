@@ -30,7 +30,7 @@ def vi_dicts(inFile):
     return voltage, current
 
 
-def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
+def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
     g_voltages   = []
     min_voltages = []
 
@@ -43,7 +43,8 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
         min_currents.append(None)
 
     d_voltages, d_currents = vi_dicts(inFile)
-    for setting in sorted(d_voltages.keys()):
+    settings = sorted(d_voltages.keys())
+    for iSetting, setting in enumerate(settings):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
         for iCh in range(nCh):
@@ -51,13 +52,15 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin):
             g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
             g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
             if biasMin < voltages[iCh] and min_voltages[iCh] is None:
-                min_voltages[iCh] = setting
+                index = min(options.nLeftSkip + iSetting, len(settings) - 1)
+                min_voltages[iCh] = settings[index]
 
             iPoint = g_currents[iCh].GetN()
             g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
             g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
             if leakMin < currents[iCh] and min_currents[iCh] is None:
-                min_currents[iCh] = setting
+                index = min(options.nLeftSkip + iSetting, len(settings) - 1)
+                min_currents[iCh] = settings[index]
 
     return g_voltages, min_voltages, g_currents, min_currents
 
@@ -234,12 +237,24 @@ def opts():
                       default=80.0,
                       type="float",
                       help="maximum of plot x-axis [default %default]")
-    parser.add_option("--lsb-factor",
-                      dest="lsbFactor",
+    parser.add_option("--lsb-factor-current",
+                      dest="lsbFactorCurrent",
+                      default=0.4,
+                      type="float",
+                      metavar="f",
+                      help="multiple of LSB used for I uncertainties [default %default]")
+    parser.add_option("--lsb-factor-voltage",
+                      dest="lsbFactorVoltage",
                       default=0.5,
                       type="float",
                       metavar="f",
-                      help="multiple of LSB used for uncertainties [default %default]")
+                      help="multiple of LSB used for V uncertainties [default %default]")
+    parser.add_option("--n-left-skip",
+                      dest="nLeftSkip",
+                      default=2,
+                      type="int",
+                      metavar="n",
+                      help="ignore n lowest non-minimnal settings when fitting [default %default]")
     parser.add_option("--summary-file",
                       dest="summaryFile",
                       default="summary.pdf",
@@ -297,8 +312,9 @@ def one(inFile, options, h):
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
     g_voltages, min_voltages,\
-    g_currents, min_currents = graphs(inFile, nCh,
-                                      biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
+    g_currents, min_currents = graphs(inFile, nCh, options,
+                                      biasMonLsb*options.lsbFactorVoltage,
+                                      leakLsb*options.lsbFactorCurrent,
                                       biasMin*1.001, leakMin*1.001)
 
     p_voltages = fits(g_voltages, min_voltages, options, target,  1.0)
@@ -388,7 +404,7 @@ def histos():
                         "I_offsets_unc": (";uncertainty on fit offset (uA);channels / bin", (200, 0.0, 1.0)),
                         "V_slopes": (";fit slope  (V/V);channels / bin", (200, 0.99, 1.01)),
                         "I_slopes": (";fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
-                        "V_slopes_unc_rel": (";relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
+                        "V_slopes_unc_rel": (";relative uncertainty on fit slope;channels / bin", (200, 0.0, 5.e-4)),
                         "I_slopes_unc_rel": (";relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
     }.items():
         if len(b) == 3:
