@@ -31,12 +31,17 @@ def vi_dicts(inFile):
 
 
 def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
-    g_voltages = []
-    g_currents = []
+    g_voltages   = []
+    min_voltages = []
+    max_voltages = []
+
+    g_currents   = []
+    min_currents = []
+    max_currents = []
     for iCh in range(nCh):
         g_voltages.append(r.TGraphErrors())
         g_currents.append(r.TGraphErrors())
-        
+
     d_voltages, d_currents = vi_dicts(inFile)
     for setting in sorted(d_voltages.keys()):
         voltages = d_voltages[setting]
@@ -51,10 +56,10 @@ def graphs(inFile, nCh, biasMonUnc, leakUnc, biasMin, leakMin, options):
                 g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
                 g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
 
-    return g_voltages, g_currents
+    return g_voltages, min_voltages, max_voltages, g_currents, min_currents, max_currents
 
 
-def fits2(lst, options, target, p1_ini):
+def fits(lst, mins, maxs, options, target, p1_ini):
     out = []
 
     f = r.TF1("f", "pol2", options.bvMin, options.bvMax)
@@ -74,7 +79,7 @@ def fits2(lst, options, target, p1_ini):
     return out
 
 
-def histogram_fit_results(lst, options,
+def histogram_fit_results(lst, options, target,
                           h_pvalues, h_pvalues_vs_ch,
                           h_offsets, h_offsets_unc,
                           h_slopes, h_slopes_unc_rel,
@@ -272,9 +277,7 @@ def opts():
     return options, args
 
 
-def one(inFile, options,
-        V_pvalues, V_offsets, V_slopes, V_pvalues_vs_ch, V_offsets_unc, V_slopes_unc_rel,
-        I_pvalues, I_offsets, I_slopes, I_pvalues_vs_ch, I_offsets_unc, I_slopes_unc_rel):
+def one(inFile, options, h):
     biasMonLsb = 0.01953602  # V / ADC
 
     final = inFile.split("/")[-1]
@@ -291,44 +294,44 @@ def one(inFile, options,
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, g_currents = graphs(inFile, nCh,
-                                    biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
-                                    biasMin*1.001, leakMin*1.001, options)
+    g_voltages, min_voltages, max_voltages,\
+    g_currents, min_currents, max_currents = graphs(inFile, nCh,
+                                                    biasMonLsb*options.lsbFactor, leakLsb*options.lsbFactor,
+                                                    biasMin*1.001, leakMin*1.001, options)
 
-    can = r.TCanvas()
-
-    p_voltages = fits2(g_voltages, options, target,  1.0)
-    p_currents = fits2(g_currents, options, target, 0.15)
+    p_voltages = fits(g_voltages, min_voltages, max_voltages, options, target,  1.0)
+    p_currents = fits(g_currents, min_currents, max_currents, options, target, 0.15)
 
     if not p_voltages:
         return
 
+    can = r.TCanvas()
     can.Print(outFile + "[")
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor=r.kCyan)
-    histogram_fit_results(p_voltages, options,
-                          V_pvalues, V_pvalues_vs_ch,
-                          V_offsets, V_offsets_unc,
-                          V_slopes, V_slopes_unc_rel,
+    histogram_fit_results(p_voltages, options, target,
+                          h["V_pvalues"], h["V_pvalues_vs_ch"],
+                          h["V_offsets"], h["V_offsets_unc"],
+                          h["V_slopes"], h["V_slopes_unc_rel"],
                           warn=False)
     # histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
 
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
-    histogram_fit_results(p_currents, options,
-                          I_pvalues, I_pvalues_vs_ch,
-                          I_offsets, I_offsets_unc,
-                          I_slopes, I_slopes_unc_rel)
+    histogram_fit_results(p_currents, options, target,
+                          h["I_pvalues"], h["I_pvalues_vs_ch"],
+                          h["I_offsets"], h["I_offsets_unc"],
+                          h["I_slopes"], h["I_slopes_unc_rel"])
 
     histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="I leak", unit="uA")
     can.Print(outFile + "]")
     printer.gray("Wrote %s" % outFile)
 
 
-def draw_summary(options, lst):
+def draw_summary(options, hs):
     outFile = options.summaryFile
 
     can = r.TCanvas()
     can.Print(outFile + "[")
-    nPads = len(lst) // 2
+    nPads = len(hs) // 2
     can.DivideSquare(nPads)
 
     line = r.TLine()
@@ -336,7 +339,9 @@ def draw_summary(options, lst):
     line.SetLineStyle(2)
 
     keep = []
-    for iH, h in enumerate(lst):
+    for iH, key in enumerate(["V_pvalues", "V_offsets", "V_slopes", "V_pvalues_vs_ch", "V_offsets_unc", "V_slopes_unc_rel",
+                              "I_pvalues", "I_offsets", "I_slopes", "I_pvalues_vs_ch", "I_offsets_unc", "I_slopes_unc_rel"]):
+        h = hs[key]
         can.cd(1 + (iH % nPads))
         r.gPad.SetTickx()
         r.gPad.SetTicky()
@@ -349,7 +354,7 @@ def draw_summary(options, lst):
         h.SetLineWidth(2)
         h.SetMinimum(0.5)
 
-        if h.GetName().startswith("Ileak"):
+        if h.GetName().startswith("I_"):
             xs = []
             if "_rel" in h.GetName():
                 xs = [options.threshold_rel_unc_warn]
@@ -361,39 +366,40 @@ def draw_summary(options, lst):
             for x in xs:
                 keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
 
-        if (iH % nPads) == (nPads - 1) or iH == len(lst) - 1:
+        if (iH % nPads) == (nPads - 1) or iH == len(hs) - 1:
             can.Print(outFile)
 
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
 
 
-def main(options, args):
-    V_pvalues = r.TH1D("V_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
-    I_pvalues = r.TH1D("Ileak_pvalues", ";fit p-value;channels / bin", 202, 0.0, 1.01)
-
+def histos():
     nCh = 64  # FIXME
-    V_pvalues_vs_ch = r.TH2D("V_pvalues_vs_qie", ";QIE channel number;fit p-value;channels / bin",
-                              nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)
-    I_pvalues_vs_ch = r.TH2D("Ileak_pvalues_vs_qie", ";QIE channel number;fit p-value;channels / bin",
-                              nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)
+    out = {}
+    for key, (t, b) in {"V_pvalues": (";fit p-value;channels / bin", (202, 0.0, 1.01)),
+                        "I_pvalues": (";fit p-value;channels / bin", (202, 0.0, 1.01)),
+                        "V_pvalues_vs_ch": (";QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
+                        "I_pvalues_vs_ch": (";QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
+                        "V_offsets": (";fit offset  (V);channels / bin", (200, -0.2, 0.2)),
+                        "I_offsets": (";fit offset (uA);channels / bin", (200, -50.0, 50.0)),
+                        "V_offsets_unc": (";uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.02)),
+                        "I_offsets_unc": (";uncertainty on fit offset (uA);channels / bin", (200, 0.0, 1.0)),
+                        "V_slopes": (";fit slope  (V/V);channels / bin", (200, 0.99, 1.01)),
+                        "I_slopes": (";fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
+                        "V_slopes_unc_rel": (";relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
+                        "I_slopes_unc_rel": (";relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
+    }.items():
+        if len(b) == 3:
+            out[key] = r.TH1D(key, t, *b)
+        else:
+            out[key] = r.TH2D(key, t, *b)
+    return out
 
-    V_offsets = r.TH1D("V_offsets", ";fit offset (V);channels / bin", 200, -0.2, 0.2)
-    I_offsets = r.TH1D("Ileak_offsets", ";fit offset (uA);channels / bin", 200, -50.0, 50.0)
 
-    V_offsets_unc = r.TH1D("V_offsets_unc", ";uncertainty on fit offset (V);channels / bin", 200, 0.0, 0.02)
-    I_offsets_unc = r.TH1D("Ileak_offsets_unc", ";uncertainty on fit offset (uA);channels / bin", 200, 0.0, 1.0)
-
-    V_slopes = r.TH1D("V_slopes", ";fit slope (V/V);channels / bin", 200, 0.99, 1.01)
-    I_slopes = r.TH1D("Ileak_slopes", ";fit slope (uA/V);channels / bin", 200, 0.0, 0.50)
-
-    V_slopes_unc_rel = r.TH1D("V_slopes_unc_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 2.e-4)
-    I_slopes_unc_rel = r.TH1D("Ileak_slopes_unc_rel", ";relative uncertainty on fit slope;channels / bin", 200, 0.0, 0.4)
-
-    h = [V_pvalues, V_offsets, V_slopes, V_pvalues_vs_ch, V_offsets_unc, V_slopes_unc_rel,
-         I_pvalues, I_offsets, I_slopes, I_pvalues_vs_ch, I_offsets_unc, I_slopes_unc_rel]
+def main(options, args):
+    h = histos()
     for arg in args:
-        one(arg, options, *h)
+        one(arg, options, h)
 
     draw_summary(options, h)
 
