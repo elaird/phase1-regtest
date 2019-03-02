@@ -66,8 +66,7 @@ def fits(lst, mins, options, target, p1_ini):
     out = []
 
     for iGraph, g in enumerate(lst):
-        nPoints = g.GetN()
-        if not nPoints:
+        if not g.GetN():
             continue
 
         f = r.TF1("f", "pol2", max(mins[iGraph], options.bvMin), options.bvMax)
@@ -75,7 +74,7 @@ def fits(lst, mins, options, target, p1_ini):
         f.FixParameter(2, 0.0)
         g.Fit(f, "refq0")
 
-        res = {-3: nPoints, -2: f.GetChisquare(), -1: f.GetProb(),}
+        res = {-3: f.GetNumberFitPoints(), -2: f.GetChisquare(), -1: f.GetProb(),}
         for iPar in range(3):
             res[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
         out.append(res)
@@ -170,7 +169,7 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, 
         yMin = {-3:   0, -1: 0.0, 0:-20.0, 1: 0.00, 2:-0.01}
         yMax = {-3: 100, -1: 1.1, 0: 20.0, 1: 0.50, 2: 0.01}
 
-    par_name = {-3: "number of points",
+    par_name = {-3: "number of fit points",
                 -2: "fit #chi^{2}",
                 -1: "fit probability",
                  0: "fit offset (%s)" % unit,
