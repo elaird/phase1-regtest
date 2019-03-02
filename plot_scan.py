@@ -61,16 +61,18 @@ def fits2(lst, options, target, p1_ini,
           warn=True):
     out = []
 
-    f = r.TF1("f", "[0] + [1]*x", options.bvMin, options.bvMax)
+    f = r.TF1("f", "pol2", options.bvMin, options.bvMax)
     for iGraph, g in enumerate(lst):
-        if not g.GetN():
+        nPoints = g.GetN()
+        if not nPoints:
             continue
 
-        f.SetParameters(0.0, p1_ini)
-        g.Fit(f, "q0")
+        f.SetParameters(0.0, p1_ini, 0.0)
+        f.FixParameter(2, 0.0)
+        g.Fit(f, "efq0")
 
-        res = {-1: f.GetProb()}
-        for iPar in range(f.GetNumberFreeParameters()):
+        res = {-2: nPoints, -1: f.GetProb(),}
+        for iPar in range(3):
             res[iPar] = (f.GetParameter(iPar), f.GetParError(iPar))
         out.append(res)
 
@@ -136,7 +138,7 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor=r.kRed):
 
         g.SetMarkerStyle(20)
         g.SetMarkerSize(0.3 * g.GetMarkerSize())
-        g.Draw("ex0psame")
+        g.Draw("psame")
     can.Print(outFile)
 
 
@@ -150,18 +152,25 @@ def histogram_fit_results(d, nCh, can, outFile, target, title, unit, do_corr=Fal
     can.SetTicky()
 
     if unit == "V":
-        yMin = {-1: 0.0, 0: 0.0, 1: 0.99}
-        yMax = {-1: 1.1, 0: 0.4, 1: 1.01}
+        yMin = {-2:   0, -1: 0.0, 0: 0.0, 1: 0.99, 2:-100}
+        yMax = {-2: 100, -1: 1.1, 0: 0.4, 1: 1.01, 2: 100}
     else:
-        yMin = {-1: 0.0, 0:-20.0, 1: 0.00}
-        yMax = {-1: 1.1, 0: 20.0, 1: 0.50}
+        yMin = {-2:   0, -1: 0.0, 0:-20.0, 1: 0.00, 2:-0.01}
+        yMax = {-2: 100, -1: 1.1, 0: 20.0, 1: 0.50, 2: 0.01}
 
-    par_name = {-1: "fit probability", 0:"fit offset (%s)" % unit, 1:"fit slope (%s / V)" % unit}
+    par_name = {-2: "number of points",
+                -1: "fit probability",
+                 0: "fit offset (%s)" % unit,
+                 1: "fit slope (%s / V)" % unit,
+                 2: "fit curvature (%s / V^{2})" % unit}
     full_title = "%s: %s" % (target, title)
 
-    for iPar in range(-1, 2, 1):
+    for iPar in range(-2, 3, 1):
         h = r.TH1D("h", "%s;QIE channel number;%s" % (full_title, par_name[iPar]), nCh, 0.5, 0.5 + nCh)
         h.SetStats(False)
+        if iPar == 2:
+            h.GetYaxis().SetTitleOffset(1.5)
+
         for iCh in range(nCh):
             iBin = h.GetBin(1 + iCh)
             if iPar < 0:
