@@ -84,7 +84,7 @@ def fits(lst, mins, options, target, p1_ini):
     return out
 
 
-def histogram_fit_results(lst, options, target,
+def histogram_fit_results(lst, options, target, h_npoints,
                           h_pvalues, h_pvalues_vs_ch,
                           h_offsets, h_offsets_unc,
                           h_slopes, h_slopes_unc_rel,
@@ -92,11 +92,18 @@ def histogram_fit_results(lst, options, target,
 
     for iRes, res in enumerate(lst):
         ch = 1 + iRes
+        s = "WARNING: %s graph %2d" % (target, ch)
+
+        npoints = res[-3]
+        h_npoints.Fill(npoints)
+        if warn and npoints < options.threshold_npoints_warn:
+            printer.red("%s has %d points" % (s, npoints))
+
         pvalue = res[-1]
         h_pvalues.Fill(pvalue)
         h_pvalues_vs_ch.Fill(ch, pvalue)
         if warn and pvalue < options.threshold_pvalue_warn:
-            printer.red("WARNING: %s graph %d has fit prob. %e" % (target, ch, pvalue))
+            printer.dark_blue("%s has fit prob. %e" % (s, pvalue))
 
         h_offsets.Fill(res[0][0])
         h_offsets_unc.Fill(res[0][1])
@@ -104,13 +111,13 @@ def histogram_fit_results(lst, options, target,
         slope = res[1][0]
         h_slopes.Fill(slope)
         if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
-            printer.purple("WARNING: fit slope %g" % slope)
+            printer.purple("%s has fit slope %g" % (s, slope))
 
         if slope:
             rel_unc = res[1][1] / slope
             h_slopes_unc_rel.Fill(rel_unc)
-            if warn and options.threshold_rel_unc_warn < rel_unc:
-                printer.cyan("WARNING: fit rel unc %g" % rel_unc)
+            if warn and options.threshold_slope_rel_unc_warn < rel_unc:
+                printer.cyan("%s has fit rel unc %g" % (s, rel_unc))
 
 
 def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor=r.kRed):
@@ -260,12 +267,18 @@ def opts():
                       default="summary.pdf",
                       metavar="s",
                       help="summary file [default %default]")
-    parser.add_option("--threshold-rel-unc-warn",
-                      dest="threshold_rel_unc_warn",
+    parser.add_option("--threshold-npoints-warn",
+                      dest="threshold_npoints_warn",
+                      default=5,
+                      type="int",
+                      metavar="n",
+                      help="npoints below which to warn  [default %default]")
+    parser.add_option("--threshold-slope-rel-unc-warn",
+                      dest="threshold_slope_rel_unc_warn",
                       default=0.05,
                       type="float",
                       metavar="x",
-                      help="rel unc above which to warn  [default %default]")
+                      help="slope rel unc above which to warn  [default %default]")
     parser.add_option("--threshold-slope-lo-warn",
                       dest="threshold_slope_lo_warn",
                       default=0.11,
@@ -327,6 +340,7 @@ def one(inFile, options, h):
     can.Print(outFile + "[")
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor=r.kCyan)
     histogram_fit_results(p_voltages, options, target,
+                          h["V_npoints"],
                           h["V_pvalues"], h["V_pvalues_vs_ch"],
                           h["V_offsets"], h["V_offsets_unc"],
                           h["V_slopes"], h["V_slopes_unc_rel"],
@@ -335,6 +349,7 @@ def one(inFile, options, h):
 
     draw_per_channel(g_currents, "Ileak(uA)", 40.0, can, outFile)
     histogram_fit_results(p_currents, options, target,
+                          h["I_npoints"],
                           h["I_pvalues"], h["I_pvalues_vs_ch"],
                           h["I_offsets"], h["I_offsets_unc"],
                           h["I_slopes"], h["I_slopes_unc_rel"])
@@ -347,9 +362,12 @@ def one(inFile, options, h):
 def draw_summary(options, hs):
     outFile = options.summaryFile
 
+    keys = ["V_pvalues", "V_offsets", "V_slopes", "V_npoints", "V_offsets_unc", "V_slopes_unc_rel",
+            "I_pvalues", "I_offsets", "I_slopes", "I_npoints", "I_offsets_unc", "I_slopes_unc_rel"]
+
     can = r.TCanvas()
     can.Print(outFile + "[")
-    nPads = len(hs) // 2
+    nPads = len(keys) // 2
     can.DivideSquare(nPads)
 
     line = r.TLine()
@@ -357,16 +375,12 @@ def draw_summary(options, hs):
     line.SetLineStyle(2)
 
     keep = []
-    for iH, key in enumerate(["V_pvalues", "V_offsets", "V_slopes", "V_pvalues_vs_ch", "V_offsets_unc", "V_slopes_unc_rel",
-                              "I_pvalues", "I_offsets", "I_slopes", "I_pvalues_vs_ch", "I_offsets_unc", "I_slopes_unc_rel"]):
+    for iH, key in enumerate(keys):
         h = hs[key]
         can.cd(1 + (iH % nPads))
         r.gPad.SetTickx()
         r.gPad.SetTicky()
         r.gPad.SetLogy("pvalue" not in h.GetName())
-
-        if "vs" in h.GetName():
-            continue
 
         h.Draw("colz" if "vs" in h.GetName() else "")
         h.SetLineWidth(2)
@@ -375,7 +389,7 @@ def draw_summary(options, hs):
         if h.GetName().startswith("I_"):
             xs = []
             if "_rel" in h.GetName():
-                xs = [options.threshold_rel_unc_warn]
+                xs = [options.threshold_slope_rel_unc_warn]
             elif h.GetName().endswith("p_values"):
                 xs = [options.threshold_pvalue_warn]
             elif "slope" in h.GetName():
@@ -384,7 +398,7 @@ def draw_summary(options, hs):
             for x in xs:
                 keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
 
-        if (iH % nPads) == (nPads - 1) or iH == len(hs) - 1:
+        if (iH % nPads) == (nPads - 1) or iH == len(keys) - 1:
             can.Print(outFile)
 
     can.Print(outFile + "]")
@@ -394,7 +408,10 @@ def draw_summary(options, hs):
 def histos():
     nCh = 64  # FIXME
     out = {}
-    for key, (t, b) in {"V_pvalues": (";fit p-value;channels / bin", (202, 0.0, 1.01)),
+    nPoints = 100
+    for key, (t, b) in {"V_npoints": (";number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
+                        "I_npoints": (";number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
+                        "V_pvalues": (";fit p-value;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues": (";fit p-value;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues_vs_ch": (";QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
                         "I_pvalues_vs_ch": (";QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
