@@ -187,7 +187,8 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
         f1.Draw("same")
 
         g.SetMarkerStyle(20)
-        g.SetMarkerSize(0.3 * g.GetMarkerSize())
+        g.SetMarkerSize(1.0)
+
         g.Draw("psame")
     can.Print(outFile)
 
@@ -218,6 +219,10 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, 
 
         h = r.TH1D("h", "%s: %s;QIE channel number;%s" % (target, title, par_name), nCh, 0.5, 0.5 + nCh)
         h.SetStats(False)
+        h.SetMarkerStyle(20)
+        h.SetMarkerSize(4.0)
+        h.SetMarkerColor(h.GetLineColor())
+
         if iPar == 2:
             h.GetYaxis().SetTitleOffset(1.5)
 
@@ -229,10 +234,7 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit, 
                 c, e = d[iCh][iPar]
                 h.SetBinContent(iBin, c)
                 h.SetBinError(iBin, e)
-        h.Draw("p")
-        h.SetMarkerStyle(20)
-        h.SetMarkerSize(0.5 * h.GetMarkerSize())
-        h.SetMarkerColor(h.GetLineColor())
+        h.Draw("pe" if 0 <=iPar else "p")
         if iPar in yMin and iPar in yMax:
             h.GetYaxis().SetRangeUser(yMin[iPar], yMax[iPar])
         can.Print(outFile)
@@ -270,24 +272,24 @@ def opts():
                       help="minimum of plot x-axis [default %default]")
     parser.add_option("--bv-max",
                       dest="bvMax",
-                      default=80.0,
+                      default=60.0,
                       type="float",
                       help="maximum of plot x-axis [default %default]")
     parser.add_option("--lsb-factor-current",
                       dest="lsbFactorCurrent",
-                      default=0.4,
+                      default=0.35,
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for I uncertainties [default %default]")
     parser.add_option("--lsb-factor-voltage",
                       dest="lsbFactorVoltage",
-                      default=0.5,
+                      default=0.48,
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for V uncertainties [default %default]")
     parser.add_option("--n-left-skip",
                       dest="nLeftSkip",
-                      default=2,
+                      default=8,
                       type="int",
                       metavar="n",
                       help="ignore n lowest non-minimnal settings when fitting [default %default]")
@@ -298,7 +300,7 @@ def opts():
                       help="summary file [default %default]")
     parser.add_option("--threshold-chi2-warn",
                       dest="threshold_chi2_warn",
-                      default=30.0,
+                      default=50.0,
                       type="float",
                       metavar="x",
                       help="chi2 above which to warn  [default %default]")
@@ -377,7 +379,7 @@ def one(inFile, options, h):
     if not p_voltages:
         return
 
-    can = r.TCanvas()
+    can = r.TCanvas("canvas", "canvas", 8000, 6000)
     can.Print(outFile + "[")
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor1=r.kBlue+3, fColor2=r.kCyan)
     histogram_fit_results(p_voltages, options, target,
@@ -464,14 +466,14 @@ def histos():
                         "I_pvalues": ("I;fit p-value;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues_vs_ch": ("V;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
                         "I_pvalues_vs_ch": ("I;QIE channel number;fit p-value;channels / bin", (nCh, 0.5, 0.5 + nCh, 11, 0.0, 1.1)),
-                        "V_chi2": ("V;fit #chi^2;channels / bin", (nChi2, -10.0, 100.0)),
-                        "I_chi2": ("I;fit #chi^2;channels / bin", (nChi2, -10.0, 100.0)),
+                        "V_chi2": ("V;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
+                        "I_chi2": ("I;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
                         "V_delta_chi2": ("V;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
                         "I_delta_chi2": ("I;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.02)),
-                        "I_offsets_unc": ("I;uncertainty on fit offset (uA);channels / bin", (200, 0.0, 1.0)),
+                        "I_offsets_unc": ("I;uncertainty on fit offset (uA);channels / bin", (200, 0.0, 5.0)),
                         "V_slopes": ("V;fit slope  (V/V);channels / bin", (200, 0.99, 1.01)),
                         "I_slopes": ("I;fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
                         "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 5.e-4)),
