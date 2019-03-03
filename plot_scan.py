@@ -40,11 +40,11 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
     min_bv_currents = []
     for iCh in range(nCh):
         g_voltages.append(r.TGraphErrors())
-        factor_voltages.append(None)
+        factor_voltages.append(-1)
         min_bv_voltages.append(None)
 
         g_currents.append(r.TGraphErrors())
-        factor_currents.append(None)
+        factor_currents.append(-1)
         min_bv_currents.append(None)
 
     d_voltages, d_currents = vi_dicts(inFile)
@@ -52,28 +52,34 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
     for iSetting, setting in enumerate(settings):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
+        running_out_of_points = len(settings) < iSetting + 9  # FIXME: config
+
         for iCh in range(nCh):
             iPoint = g_voltages[iCh].GetN()
             g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
             g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
-            if biasMin < voltages[iCh] and min_bv_voltages[iCh] is None:
+
+            if d_voltages[settings[0]][iCh]:  # FIXME: stale
+                factor = voltages[iCh] / d_voltages[settings[0]][iCh]
+
+            good = biasMin < voltages[iCh] and 1.5 < factor  # FIXME: config
+            if min_bv_voltages[iCh] is None and (good or running_out_of_points):
                 index = min(options.nLeftSkip + iSetting, len(settings) - 1)
                 min_bv_voltages[iCh] = settings[index]
-                if d_voltages[settings[0]][iCh]:
-                    factor_voltages[iCh] = voltages[iCh] / d_voltages[settings[0]][iCh]
-                else:
-                    factor_voltages[iCh] = 999.
+                factor_voltages[iCh] = factor
 
             iPoint = g_currents[iCh].GetN()
             g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
             g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
-            if leakMin < currents[iCh] and min_bv_currents[iCh] is None:
+
+            if d_currents[settings[0]][iCh]:  # FIXME: stale
+                factor = currents[iCh] / d_currents[settings[0]][iCh]
+
+            good = leakMin < currents[iCh] and 1.5 < factor  # FIXME: config
+            if min_bv_currents[iCh] is None and (good or running_out_of_points):
                 index = min(options.nLeftSkip + iSetting, len(settings) - 1)
                 min_bv_currents[iCh] = settings[index]
-                if d_currents[settings[0]][iCh]:
-                    factor_currents[iCh] = currents[iCh] / d_currents[settings[0]][iCh]
-                else:
-                    factor_currents[iCh] = 999.
+                factor_currents[iCh] = factor
 
     return g_voltages, min_bv_voltages, factor_voltages, g_currents, min_bv_currents, factor_currents
 
@@ -202,7 +208,6 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
 
         g.SetMarkerStyle(20)
         g.SetMarkerSize(1.0)
-
         g.Draw("psame")
     can.Print(outFile)
 
@@ -283,7 +288,7 @@ def opts():
                       help="multiple of LSB used for V uncertainties [default %default]")
     parser.add_option("--n-left-skip",
                       dest="nLeftSkip",
-                      default=8,
+                      default=0,
                       type="int",
                       metavar="n",
                       help="ignore n lowest non-minimnal settings when fitting [default %default]")
@@ -318,7 +323,7 @@ def opts():
                       help="slope below which to warn  [default %default]")
     parser.add_option("--threshold-slope-hi-warn",
                       dest="threshold_slope_hi_warn",
-                      default=0.2,
+                      default=0.19,
                       type="float",
                       metavar="x",
                       help="slope above which to warn  [default %default]")
