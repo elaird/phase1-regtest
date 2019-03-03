@@ -31,16 +31,21 @@ def vi_dicts(inFile):
 
 
 def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
-    g_voltages   = []
-    min_voltages = []
+    g_voltages      = []
+    factor_voltages = []
+    min_bv_voltages = []
 
-    g_currents   = []
-    min_currents = []
+    g_currents      = []
+    factor_currents = []
+    min_bv_currents = []
     for iCh in range(nCh):
         g_voltages.append(r.TGraphErrors())
-        min_voltages.append(None)
+        factor_voltages.append(None)
+        min_bv_voltages.append(None)
+
         g_currents.append(r.TGraphErrors())
-        min_currents.append(None)
+        factor_currents.append(None)
+        min_bv_currents.append(None)
 
     d_voltages, d_currents = vi_dicts(inFile)
     settings = sorted(d_voltages.keys())
@@ -51,18 +56,26 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
             iPoint = g_voltages[iCh].GetN()
             g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
             g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
-            if biasMin < voltages[iCh] and min_voltages[iCh] is None:
+            if biasMin < voltages[iCh] and min_bv_voltages[iCh] is None:
                 index = min(options.nLeftSkip + iSetting, len(settings) - 1)
-                min_voltages[iCh] = settings[index]
+                min_bv_voltages[iCh] = settings[index]
+                if d_voltages[settings[0]][iCh]:
+                    factor_voltages[iCh] = voltages[iCh] / d_voltages[settings[0]][iCh]
+                else:
+                    factor_voltages[iCh] = 999.
 
             iPoint = g_currents[iCh].GetN()
             g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
             g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
-            if leakMin < currents[iCh] and min_currents[iCh] is None:
+            if leakMin < currents[iCh] and min_bv_currents[iCh] is None:
                 index = min(options.nLeftSkip + iSetting, len(settings) - 1)
-                min_currents[iCh] = settings[index]
+                min_bv_currents[iCh] = settings[index]
+                if d_currents[settings[0]][iCh]:
+                    factor_currents[iCh] = currents[iCh] / d_currents[settings[0]][iCh]
+                else:
+                    factor_currents[iCh] = 999.
 
-    return g_voltages, min_voltages, g_currents, min_currents
+    return g_voltages, min_bv_voltages, factor_voltages, g_currents, min_bv_currents, factor_currents
 
 
 def fit_results(f):
@@ -94,7 +107,9 @@ def fits(lst, mins, options, target, p1_ini):
     return out
 
 
-def histogram_fit_results(lst, options, target, h_npoints,
+def histogram_fit_results(lst, mins, factors,
+                          options, target,
+                          h_npoints, h_mins, h_factors,
                           h_pvalues, h_pvalues2,
                           h_delta_chi2, h_delta_chi2_cut_vs_ch,
                           h_offsets, h_offsets_unc,
@@ -109,6 +124,9 @@ def histogram_fit_results(lst, options, target, h_npoints,
         h_npoints.Fill(npoints)
         if warn and npoints < options.threshold_npoints_warn:
             printer.red("%s has %d points" % (s, npoints))
+
+        h_mins.Fill(mins[iRes])
+        h_factors.Fill(factors[iRes])
 
         pvalue = res[-1]
         h_pvalues.Fill(pvalue)
@@ -331,14 +349,14 @@ def one(inFile, options, h):
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, min_voltages,\
-    g_currents, min_currents = graphs(inFile, nCh, options,
-                                      biasMonLsb*options.lsbFactorVoltage,
-                                      leakLsb*options.lsbFactorCurrent,
-                                      biasMin*1.001, leakMin*1.001)
+    g_voltages, min_bv_voltages, factor_voltages,\
+    g_currents, min_bv_currents, factor_currents = graphs(inFile, nCh, options,
+                                                          biasMonLsb*options.lsbFactorVoltage,
+                                                          leakLsb*options.lsbFactorCurrent,
+                                                          biasMin*1.001, leakMin*1.001)
 
-    p_voltages = fits(g_voltages, min_voltages, options, target,  1.0)
-    p_currents = fits(g_currents, min_currents, options, target, 0.15)
+    p_voltages = fits(g_voltages, min_bv_voltages, options, target,  1.0)
+    p_currents = fits(g_currents, min_bv_currents, options, target, 0.15)
 
     if not p_voltages:
         return
@@ -346,8 +364,9 @@ def one(inFile, options, h):
     can = r.TCanvas("canvas", "canvas", 8000, 6000)
     can.Print(outFile + "[")
     draw_per_channel(g_voltages, "BVmeas(V)", 80.0, can, outFile, fColor1=r.kBlue+3, fColor2=r.kCyan)
-    histogram_fit_results(p_voltages, options, target,
-                          h["V_npoints"],
+    histogram_fit_results(p_voltages, min_bv_voltages, factor_voltages,
+                          options, target,
+                          h["V_npoints"], h["V_mins"], h["V_factors"],
                           h["V_pvalues"], h["V_pvalues2"],
                           h["V_delta_chi2"], h["V_delta_chi2_cut_vs_ch"],
                           h["V_offsets"], h["V_offsets_unc"],
@@ -356,8 +375,9 @@ def one(inFile, options, h):
     # histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="BV meas", unit="V")
                           
     draw_per_channel(g_currents, "Ileak(uA) ", 40.0, can, outFile)
-    histogram_fit_results(p_currents, options, target,
-                          h["I_npoints"],
+    histogram_fit_results(p_currents, min_bv_currents, factor_currents,
+                          options, target,
+                          h["I_npoints"], h["I_mins"], h["I_factors"],
                           h["I_pvalues"], h["I_pvalues2"],
                           h["I_delta_chi2"], h["I_delta_chi2_cut_vs_ch"],
                           h["I_offsets"], h["I_offsets_unc"],
@@ -370,8 +390,10 @@ def one(inFile, options, h):
 
 
 def multi_panel(options, hs, can, outFile, keys):
-    nPads = 4
+    can.cd(0)
     can.Clear()
+
+    nPads = 4
     can.DivideSquare(nPads)
 
     line = r.TLine()
@@ -384,11 +406,19 @@ def multi_panel(options, hs, can, outFile, keys):
         can.cd(1 + (iH % nPads))
         r.gPad.SetTickx()
         r.gPad.SetTicky()
-        r.gPad.SetLogy("pvalue" not in h.GetName())
 
-        h.Draw("colz" if "vs" in h.GetName() else "")
-        h.SetLineWidth(2)
-        h.SetMinimum(0.5)
+        if "vs" in h.GetName():
+            h.SetBinErrorOption(r.TH1.kPoisson)
+            h.Draw("e0p")
+            h.SetLineWidth(2)
+            # h.SetMarkerStyle(20)
+            h.SetMarkerColor(h.GetLineColor())
+            r.gPad.SetLogy(False)
+        else:
+            h.Draw("")
+            h.SetLineWidth(2)
+            h.SetMinimum(0.5)
+            r.gPad.SetLogy("pvalue" not in h.GetName())
 
         if h.GetName().startswith("I_"):
             xs = []
@@ -396,7 +426,7 @@ def multi_panel(options, hs, can, outFile, keys):
                 xs = [options.threshold_slope_rel_unc_warn]
             elif "slope" in h.GetName():
                 xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
-            elif "delta_chi2" in h.GetName():
+            elif "delta_chi2" in h.GetName() and "vs" not in h.GetName():
                 xs = [options.threshold_delta_chi2_warn]
 
             for x in xs:
@@ -418,18 +448,16 @@ def draw_summary(options, hs):
     can.Print(outFile + "[")
 
     multi_panel(options, hs, can, outFile,
-                ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2", "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel"])
+                ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2",
+                 "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel",
+                 "V_mins", "V_factors", "V_delta_chi2_cut_vs_ch",
+                ])
 
     multi_panel(options, hs, can, outFile,
-                ["I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2", "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel"])
-
-    h = hs["I_delta_chi2_cut_vs_ch"]
-    h.SetBinErrorOption(r.TH1.kPoisson)
-    h.Draw("e0p")
-    h.SetLineWidth(2)
-    h.SetMarkerStyle(20)
-    h.SetMarkerColor(h.GetLineColor())
-    can.Print(outFile)
+                ["I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2",
+                 "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel",
+                 "I_mins", "I_factors", "I_delta_chi2_cut_vs_ch",
+                ])
 
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
@@ -442,6 +470,10 @@ def histos(threshold_delta_chi2_warn):
     nChi2 = 201
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "I_npoints": ("I;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
+                        "V_mins": ("V;fit min BV;channels / bin", (80, 0.0, 80.0)),
+                        "I_mins": ("I;fit min BV;channels / bin", (80, 0.0, 80.0)),
+                        "V_factors": ("V;fit min V / V0;channels / bin", (100, 0.0, 10.0)),
+                        "I_factors": ("I;fit min I / I0;channels / bin", (100, 0.0, 10.0)),
                         "V_pvalues": ("V;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues": ("I;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues2": ("V;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
