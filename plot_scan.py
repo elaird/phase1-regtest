@@ -58,8 +58,11 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
             g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
             g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
 
-            if d_voltages[settings[0]][iCh]:  # FIXME: stale
-                factor = voltages[iCh] / d_voltages[settings[0]][iCh]
+            for setting2 in settings:
+                denom = d_voltages[setting2][iCh]
+                if denom:
+                    factor = voltages[iCh] / denom
+                    break
 
             good = biasMin < voltages[iCh] and options.pedFactor < factor
             if min_bv_voltages[iCh] is None and (good or options.bvMaxMin <= setting):
@@ -70,8 +73,11 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
             g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
             g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
 
-            if d_currents[settings[0]][iCh]:  # FIXME: stale
-                factor = currents[iCh] / d_currents[settings[0]][iCh]
+            for setting2 in settings:
+                denom = d_currents[setting2][iCh]
+                if denom:
+                    factor = currents[iCh] / denom
+                    break
 
             good = leakMin < currents[iCh] and options.pedFactor < factor
             if min_bv_currents[iCh] is None and (good or options.bvMaxMin <= setting):
