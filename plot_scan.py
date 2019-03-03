@@ -52,7 +52,6 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
     for iSetting, setting in enumerate(settings):
         voltages = d_voltages[setting]
         currents = d_currents[setting]
-        running_out_of_points = len(settings) < iSetting + 9  # FIXME: config
 
         for iCh in range(nCh):
             iPoint = g_voltages[iCh].GetN()
@@ -62,10 +61,9 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
             if d_voltages[settings[0]][iCh]:  # FIXME: stale
                 factor = voltages[iCh] / d_voltages[settings[0]][iCh]
 
-            good = biasMin < voltages[iCh] and 1.5 < factor  # FIXME: config
-            if min_bv_voltages[iCh] is None and (good or running_out_of_points):
-                index = min(options.nLeftSkip + iSetting, len(settings) - 1)
-                min_bv_voltages[iCh] = settings[index]
+            good = biasMin < voltages[iCh] and options.pedFactor < factor
+            if min_bv_voltages[iCh] is None and (good or options.bvMaxMin <= setting):
+                min_bv_voltages[iCh] = settings[iSetting]
                 factor_voltages[iCh] = factor
 
             iPoint = g_currents[iCh].GetN()
@@ -75,10 +73,9 @@ def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
             if d_currents[settings[0]][iCh]:  # FIXME: stale
                 factor = currents[iCh] / d_currents[settings[0]][iCh]
 
-            good = leakMin < currents[iCh] and 1.5 < factor  # FIXME: config
-            if min_bv_currents[iCh] is None and (good or running_out_of_points):
-                index = min(options.nLeftSkip + iSetting, len(settings) - 1)
-                min_bv_currents[iCh] = settings[index]
+            good = leakMin < currents[iCh] and options.pedFactor < factor
+            if min_bv_currents[iCh] is None and (good or options.bvMaxMin <= setting):
+                min_bv_currents[iCh] = settings[iSetting]
                 factor_currents[iCh] = factor
 
     return g_voltages, min_bv_voltages, factor_voltages, g_currents, min_bv_currents, factor_currents
@@ -98,7 +95,7 @@ def fits(lst, mins, options, target, p1_ini):
         if not g.GetN():
             continue
 
-        mm = (max(mins[iGraph], options.bvMin), options.bvMax)
+        mm = (mins[iGraph], options.bvMax)
         fops = "refq0"
         f1 = r.TF1("f1", "pol2", *mm)
         f1.SetParameters(0.0, p1_ini, 0.0)
@@ -264,16 +261,16 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
 
 def opts():
     parser = optparse.OptionParser(usage="usage: %prog [options] FILE1 [FILE2 ...]")
-    parser.add_option("--bv-min",
-                      dest="bvMin",
-                      default=0.0,
+    parser.add_option("--bv-max-min",
+                      dest="bvMaxMin",
+                      default=46.0,
                       type="float",
-                      help="minimum of plot x-axis [default %default]")
+                      help="maximum minimum of fit range [default %default]")
     parser.add_option("--bv-max",
                       dest="bvMax",
                       default=60.0,
                       type="float",
-                      help="maximum of plot x-axis [default %default]")
+                      help="maximum of fit range [default %default]")
     parser.add_option("--lsb-factor-current",
                       dest="lsbFactorCurrent",
                       default=0.35,
@@ -286,12 +283,12 @@ def opts():
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for V uncertainties [default %default]")
-    parser.add_option("--n-left-skip",
-                      dest="nLeftSkip",
-                      default=0,
-                      type="int",
-                      metavar="n",
-                      help="ignore n lowest non-minimnal settings when fitting [default %default]")
+    parser.add_option("--ped-factor",
+                      dest="pedFactor",
+                      default=1.5,
+                      type="float",
+                      metavar="f",
+                      help="ignore values below f*y0 [default %default]")
     parser.add_option("--summary-file",
                       dest="summaryFile",
                       default="summary.pdf",
@@ -299,7 +296,7 @@ def opts():
                       help="summary file [default %default]")
     parser.add_option("--threshold-delta-chi2-warn",
                       dest="threshold_delta_chi2_warn",
-                      default=20.0,
+                      default=30.0,
                       type="float",
                       metavar="x",
                       help="delta chi2 above which to warn  [default %default]")
@@ -311,7 +308,7 @@ def opts():
                       help="npoints below which to warn  [default %default]")
     parser.add_option("--threshold-slope-rel-unc-warn",
                       dest="threshold_slope_rel_unc_warn",
-                      default=0.05,
+                      default=0.06,
                       type="float",
                       metavar="x",
                       help="slope rel unc above which to warn  [default %default]")
@@ -491,11 +488,11 @@ def histos(threshold_delta_chi2_warn):
                         "I_delta_chi2_cut_vs_ch": ("I (%g < #chi^{2}_{c*} - #chi^{2}_{0});QIE channel number;channels / bin" % threshold_delta_chi2_warn, (nCh, 0.5, 0.5 + nCh)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
-                        "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.02)),
+                        "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.007)),
                         "I_offsets_unc": ("I;uncertainty on fit offset (uA);channels / bin", (200, 0.0, 5.0)),
                         "V_slopes": ("V;fit slope  (V/V);channels / bin", (200, 0.99, 1.01)),
                         "I_slopes": ("I;fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
-                        "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 5.e-4)),
+                        "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
                         "I_slopes_unc_rel": ("I;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
     }.items():
         if len(b) == 3:
