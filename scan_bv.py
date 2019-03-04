@@ -44,7 +44,7 @@ def opts(multi_target=False):
                       help="maximum BV setting (V) [default %default]")
     parser.add_option("--step",
                       dest="bvStep",
-                      default=5,
+                      default=1,
                       type="int",
                       help="step size (V) [default %default]")
 
