@@ -229,11 +229,11 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
         yMax = {-3: 100, -1: 1.1, 0: 0.4, 1: 1.01, 2: 100}
     else:
         yMin = {-3:   0, -1: 0.0, 0:-20.0, 1: 0.00, 2:-0.01}
-        yMax = {-3: 100, -1: 1.1, 0: 20.0, 1: 0.50, 2: 0.01}
+        yMax = {-3: 100, -1: 1.1, 0: 20.0, 1: 1.00, 2: 0.01}
 
     for iPar, par_name in [(-3, "number of fit points"),
                            (-1, "fit1 p-value"),
-                           (-2, "#chi^{2}_{c*} - #chi^{2}_{0}"),
+                           (-2, "#chi^{2}_{0} - #chi^{2}_{c*}"),
                            ( 0, "fit1 offset (%s)" % unit),
                            ( 1, "fit1 slope (%s / V)" % unit),
                            ( 2, "fit2 curvature (%s / V^{2})" % unit)]:
@@ -476,6 +476,7 @@ def histos(threshold_delta_chi2_warn):
     out = {}
     nPoints = 100
     nChi2 = 201
+    delta_chi2 = "#chi^{2}_{0} - #chi^{2}_{c*}"
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "I_npoints": ("I;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "V_mins": ("V;fit min BV;channels / bin", (80, 0.0, 80.0)),
@@ -486,12 +487,12 @@ def histos(threshold_delta_chi2_warn):
                         "I_pvalues": ("I;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues2": ("V;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues2": ("I;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
-                        "V_chi2": ("V;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
-                        "I_chi2": ("I;fit #chi^{2};channels / bin", (nChi2, -10.0, 100.0)),
-                        "V_delta_chi2": ("V;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -1.0, 200.0)),
-                        "I_delta_chi2": ("I;#chi^{2}_{c*} - #chi^{2}_{0};channels / bin", (nChi2, -1.0, 200.0)),
-                        "V_delta_chi2_cut_vs_ch": ("V (%g < #chi^{2}_{c*} - #chi^{2}_{0});QIE channel number;channels / bin" % threshold_delta_chi2_warn, (nCh, 0.5, 0.5 + nCh)),
-                        "I_delta_chi2_cut_vs_ch": ("I (%g < #chi^{2}_{c*} - #chi^{2}_{0});QIE channel number;channels / bin" % threshold_delta_chi2_warn, (nCh, 0.5, 0.5 + nCh)),
+                        "V_chi2": ("V;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
+                        "I_chi2": ("I;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
+                        "V_delta_chi2": ("V;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
+                        "I_delta_chi2": ("I;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
+                        "V_delta_chi2_cut_vs_ch": ("V (%g < %s);QIE channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
+                        "I_delta_chi2_cut_vs_ch": ("I (%g < %s);QIE channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.007)),
