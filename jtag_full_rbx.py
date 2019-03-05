@@ -6,7 +6,6 @@ import jtag, printer
 
 
 def targets(rbx, options):
-    out = []
     lst = []
     for iRm in range(1, 5):
         for iCard in range(1, 5):
@@ -14,13 +13,17 @@ def targets(rbx, options):
     if options.reverse:
         lst.reverse()
 
+    out = []
     for iRm, iCard in lst:
-            if rbx.startswith("HE"):
-                out.append("%d-%d" % (iRm, iCard))
-            if rbx.startswith("HB"):
-                out.append("%d-%d-iTop" % (iRm, iCard))
-                out.append("%d-%d-iBot" % (iRm, iCard))
-        # out += ["neigh", "calib", "pulser"]
+        if rbx.startswith("HE"):
+            out.append("%d-%d" % (iRm, iCard))
+        if rbx.startswith("HB"):
+            out.append("%d-%d-iTop" % (iRm, iCard))
+            out.append("%d-%d-iBot" % (iRm, iCard))
+    if rbx.startswith("HE"):
+        out += ["calib", "pulser"]
+    if rbx.startswith("HB"):
+        out += ["calib-iTop", "calib-iBot", "pulser"]
     return out
 
 
