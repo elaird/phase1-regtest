@@ -39,7 +39,7 @@ def opts(multi_target=False):
                       help="minimum BV setting (V) [default %default]")
     parser.add_option("--maximum",
                       dest="bvMax",
-                      default=60,
+                      default=70,
                       type="int",
                       help="maximum BV setting (V) [default %default]")
     parser.add_option("--step",
@@ -146,11 +146,7 @@ class scanner(driver.driver):
 
 
     def pickle(self, d):
-        filename = "%s.pickle" % self.target
-        if os.path.exists(filename):
-            backup = "%s.moved.on.%s" % (filename, datetime.datetime.today().strftime("%Y-%m-%d-%H:%M:%S"))
-            os.rename(filename, backup)
-
+        filename = "%s_%s.pickle" % (self.target, datetime.datetime.today().strftime("%Y_%m_%d_%Hh%M"))
         with open(filename, "w") as f:
             pickle.dump(d, f)
         print("Wrote results to %s" % filename)
