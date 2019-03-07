@@ -16,6 +16,19 @@ def results(filename):
         return {}
 
 
+def mb_ch(index):
+    return [None,
+             8,  7, 16, 15,  2,  1, 10,  9,
+            14, 13,  6,  5, 12, 11,  4,  3,
+            24, 23, 32, 31, 18, 17, 26, 25,
+            30, 29, 22, 21, 28, 27, 20, 19,
+            40, 39, 48, 47, 34, 33, 42, 41,
+            46, 45, 38, 37, 44, 43, 36, 35,
+            56, 55, 64, 63, 50, 49, 58, 57,
+            62, 61, 54, 53, 60, 59, 52, 51,
+    ][index]
+
+
 def vi_dicts(inFile):
     voltage = {}
     current = {}
@@ -126,8 +139,8 @@ def histogram_fit_results(lst, mins, factors,
                           warn=True):
 
     for iRes, (res, res2) in enumerate(lst):
-        ch = 1 + iRes
-        s = "WARNING: %s graph %2d" % (target, ch)
+        ch = mb_ch(1 + iRes)
+        s = "WARNING: %s MB ch %2d" % (target, ch)
 
         npoints = res[-3]
         h_npoints.Fill(npoints)
@@ -190,11 +203,12 @@ def draw_per_channel(lst, yTitle, yMax, can, outFile, fColor1=r.kRed, fColor2=r.
     
     keep = []
     for iCh in range(len(lst)):
-        can.cd(1 + iCh)
+        mb = mb_ch(1 + iCh)
+        can.cd(mb)
         r.gPad.SetTickx()
         r.gPad.SetTicky()
         null.Draw()
-        keep.append(text.DrawText(0.28, 0.75, "QIECh%d" % (1 + iCh)))
+        keep.append(text.DrawText(0.28, 0.75, "MBCh%d" % mb))
 
         g = lst[iCh]
         f2 = g.GetFunction("f2")
@@ -238,7 +252,7 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
                            ( 1, "fit1 slope (%s / V)" % unit),
                            ( 2, "fit2 curvature (%s / V^{2})" % unit)]:
 
-        h = r.TH1D("h", "%s: %s;QIE channel number;%s" % (target, title, par_name), nCh, 0.5, 0.5 + nCh)
+        h = r.TH1D("h", "%s: %s;MB channel number;%s" % (target, title, par_name), nCh, 0.5, 0.5 + nCh)
         h.SetStats(False)
         h.SetMarkerStyle(20)
         h.SetMarkerSize(4.0)
@@ -249,7 +263,7 @@ def histogram_fit_results_vs_channel(d, nCh, can, outFile, target, title, unit):
 
         for iCh in range(nCh):
             res, res2 = d[iCh]
-            iBin = h.GetBin(1 + iCh)
+            iBin = h.GetBin(mb_ch(1 + iCh))
             if iPar == -2:
                 h.SetBinContent(iBin, res[iPar] - res2[iPar])
             elif iPar < 0:
@@ -491,8 +505,8 @@ def histos(threshold_delta_chi2_warn):
                         "I_chi2": ("I;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
                         "V_delta_chi2": ("V;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
                         "I_delta_chi2": ("I;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
-                        "V_delta_chi2_cut_vs_ch": ("V (%g < %s);QIE channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
-                        "I_delta_chi2_cut_vs_ch": ("I (%g < %s);QIE channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
+                        "V_delta_chi2_cut_vs_ch": ("V (%g < %s);MB channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
+                        "I_delta_chi2_cut_vs_ch": ("I (%g < %s);MB channel number;channels / bin" % (threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.007)),
