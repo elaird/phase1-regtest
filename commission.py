@@ -213,11 +213,12 @@ class commissioner(driver.driver):
 
         if self.hb:
             if self.end in "MP":
+                host = "hcalngccm03"
                 self.sector = sector(self.rbx)
             else:  # assume 904
                 self.sector = sector(self.rbx, True)
                 host = "hcal904daq04"
-                port = 64400 if self.sector else 64000
+            port = 64400 if self.sector else 64000
         elif self.he:
             if self.end in "MP":
                 host = "hcalngccm02"
@@ -256,8 +257,8 @@ class commissioner(driver.driver):
                     fecs = "hefec2"
                     sfp = self.sector
                 else:
-                    fecs = "hefec2"
-                    sfp = self.sector - 11
+                    fecs = "hefec3"
+                    sfp = self.sector - 12
             if self.end == "P":
                 if self.sector in [10, 30]:
                     fw = hbhe_full
@@ -304,22 +305,31 @@ class commissioner(driver.driver):
                 sfp = 7
         elif self.hb:
             fw = hbhe_half
-            if self.sector == 0:
-                fecs = "hefec1"
-                fw = hbhe_full
-                sfp = 6
-            if 1 <= self.sector <= 5:
-                fecs = "hbfec1"
-                sfp = 2 * self.sector - 1
-            elif self.sector == 6:
-                fecs = "hbfec4"
-                sfp = 3
-            elif 7 <= self.sector <= 12:
-                fecs = "hbfec2"
-                sfp = 2 * (self.sector - 6) - 1
-            elif self.sector == 13:
-                fecs = "hbfec4"
-                sfp = self.sector - 12
+            if self.end == "M":
+                fecs = "hbfec5"
+                if self.sector == 18:
+                    sfp = 1
+                if self.sector == 10:
+                    sfp = 3
+                if self.sector == 11:
+                    sfp = 5
+            else:  # 904
+                if self.sector == 0:
+                    fecs = "hefec1"
+                    fw = hbhe_full
+                    sfp = 6
+                if 1 <= self.sector <= 5:
+                    fecs = "hbfec1"
+                    sfp = 2 * self.sector - 1
+                elif self.sector == 6:
+                    fecs = "hbfec4"
+                    sfp = 3
+                elif 7 <= self.sector <= 12:
+                    fecs = "hbfec2"
+                    sfp = 2 * (self.sector - 6) - 1
+                elif self.sector == 13:
+                    fecs = "hbfec4"
+                    sfp = self.sector - 12
 
         print("")
         print("-" * 7)
