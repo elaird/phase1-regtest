@@ -163,11 +163,16 @@ def histogram_fit_results(lst, mins, factors,
             if warn:
                 printer.dark_blue("%s has delta chi2 %e" % (s, delta_chi2))
 
-        h_offsets.Fill(res[0][0])
+        offset = res[0][0]
+        h_offsets.Fill(offset)
         h_offsets_unc.Fill(res[0][1])
 
         slope = res[1][0]
         h_slopes.Fill(slope)
+
+        if options.print_fit_results and slope < 0.99:  # requirement on slope hackily filters V fits
+            print("%s %2d %6.3f %6.3f" % (target.split("/")[-1], ch, offset, slope))
+
         if warn and not (options.threshold_slope_lo_warn < slope < options.threshold_slope_hi_warn):
             printer.purple("%s has fit slope  %g" % (s, slope))
 
@@ -344,6 +349,10 @@ def opts():
                       type="float",
                       metavar="x",
                       help="slope above which to warn  [default %default]")
+    parser.add_option("--print-fit-results",
+                      dest="print_fit_results",
+                      action="store_true",
+                      help="print fit results")
 
     options, args = parser.parse_args()
 
