@@ -209,23 +209,24 @@ class commissioner(driver.driver):
 
     def assign_sector_host_port(self):
         host = "localhost"
-        port = 64000
 
         if self.hb:
+            port = 64400
             if self.end in "MP":
                 host = "hcalngccm03"
                 self.sector = sector(self.rbx)
             else:  # assume 904
                 self.sector = sector(self.rbx, True)
                 host = "hcal904daq04"
-            port = 64400 if self.sector else 64000
         elif self.he:
             if self.end in "MP":
                 host = "hcalngccm02"
+                port = 64000
                 self.sector = sector(self.rbx)
             else:  # assume 904
                 self.sector = sector(self.rbx, True)
                 host = "hcal904daq04"
+                port = 64400
         elif self.hf:
             self.sector = sector(self.rbx)
             host = "hcalngccm01"
@@ -238,16 +239,17 @@ class commissioner(driver.driver):
 
     def fec(self):
         # USC: http://cmsonline.cern.ch/cms-elog/1077160
-        # 904: http://cmsonline.cern.ch/cms-elog/1077547
+        # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.15
 
         # hbhe_full = (3, 1, 2, 0x14032018)
         hbhe_full = (3, 1, 2, 0x20102017)
         hbhe_half = (4, 3, 9, 0x2102019)
+
+        fw = hbhe_half
         fecs = "unknown"
         sfp = 99
 
         if self.he:
-            fw = hbhe_half
             if self.end == "M":
                 if self.sector in [9, 29]:
                     fw = hbhe_full
@@ -272,17 +274,14 @@ class commissioner(driver.driver):
                     sfp = self.sector - 6
 
             elif self.rbx == "HE0":
-                fw = hbhe_full
-                fecs = "hefec1"
-                sfp = 2
-            elif self.rbx == "HE25":
-                fw = hbhe_half
-                fecs = "hefec5"
+                fecs = "hbfec5"
                 sfp = 1
-            elif self.rbx == "HE25R":
-                fw = hbhe_half
-                fecs = "hefec5"
-                sfp = 2
+            elif self.rbx == "HE1":
+                fecs = "hbfec5"
+                sfp = 3
+            elif self.rbx == "HE1R":
+                fecs = "hbfec5"
+                sfp = 4
         elif self.hf:
             fw = (3, 1, 2, 0x16042018)
             if self.end == "M" and 1 <= self.sector <= 6:
@@ -304,7 +303,6 @@ class commissioner(driver.driver):
                 fecs = "hffec3"
                 sfp = 7
         elif self.hb:
-            fw = hbhe_half
             if self.end == "M":
                 fecs = "hbfec5"
                 if self.sector == 18:
@@ -315,21 +313,17 @@ class commissioner(driver.driver):
                     sfp = 5
             else:  # 904
                 if self.sector == 0:
-                    fecs = "hefec1"
-                    fw = hbhe_full
-                    sfp = 6
-                if 1 <= self.sector <= 5:
-                    fecs = "hbfec1"
+                    fecs = "hbfec5"
+                    sfp = 7
+                if 1 <= self.sector <= 6:
+                    fecs = "hbfec3"
                     sfp = 2 * self.sector - 1
-                elif self.sector == 6:
-                    fecs = "hbfec4"
-                    sfp = 3
                 elif 7 <= self.sector <= 12:
-                    fecs = "hbfec2"
+                    fecs = "hbfec4"
                     sfp = 2 * (self.sector - 6) - 1
                 elif self.sector == 13:
-                    fecs = "hbfec4"
-                    sfp = self.sector - 12
+                    fecs = "hbfec5"
+                    sfp = 9
 
         print("")
         print("-" * 7)
@@ -356,7 +350,7 @@ class commissioner(driver.driver):
         else:
             letters = " "
 
-        old = self.hf or not self.sector
+        old = self.hf
 
         for i, letter in enumerate(letters):
             if letter == " ":
@@ -400,11 +394,6 @@ class commissioner(driver.driver):
         fw14 = 0x19012932
         fw15 = 0x19012922
         if self.he:
-            # fw14 = 0x17092813
-            # fw15 = 0x17092803
-            if self.sector == 0:
-                fw14 = 0x18082711
-                fw15 = 0x18082701
             sw15 = [1, 1, 0, 1]
             sw14 = [1, 1, 1, 1]
         elif self.hb:
