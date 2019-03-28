@@ -5,29 +5,6 @@ from powerMon import commandOutputFull
 import datetime, optparse, os, sys, time
 
 
-def sector(rbx, b904=False):
-    if rbx in ["lasermon", "ZDCM", "ZDCP"]:  # special cases
-        return None
-
-    if rbx[:2] not in ["HB", "HE", "HF"]:
-        sys.exit("This script only works with HB, HE, HF, lasermon, or ZDC RBXes.")
-
-    if (not b904) and (rbx[2] not in "MP"):
-        sys.exit("This script only works with P or M RBXes (unless at 904).")
-
-    try:
-        if b904:
-            s = rbx[2:]
-            if s.endswith("R"):
-                s = s[:-1]
-        else:
-            s = rbx[3:]
-        number = int(s)
-        return number
-    except ValueError:
-        sys.exit("RBX number '%s' cannot be converted to an integer." % s)
-
-
 def opts():
     parser = optparse.OptionParser(usage="usage: %prog [options] RBX")
     parser.add_option("--log-file",

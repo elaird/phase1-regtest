@@ -2,7 +2,6 @@
 
 import driver
 import datetime, optparse, os, pickle, sys, time
-from commission import sector
 
 
 def check_target(target):
