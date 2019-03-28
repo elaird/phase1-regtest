@@ -207,36 +207,6 @@ class commissioner(driver.driver):
             self.disconnect()
 
 
-    def assign_sector_host_port(self):
-        host = "localhost"
-
-        if self.hb:
-            port = 64400
-            if self.end in "MP":
-                host = "hcalngccm03"
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                host = "hcal904daq04"
-        elif self.he:
-            if self.end in "MP":
-                host = "hcalngccm02"
-                port = 64000
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                host = "hcal904daq04"
-                port = 64400
-        elif self.hf:
-            self.sector = sector(self.rbx)
-            host = "hcalngccm01"
-            port = 63000
-
-        # driver.connect assumes these are included as options
-        self.options.host = host
-        self.options.port = port
-
-
     def fec(self):
         # USC: http://cmsonline.cern.ch/cms-elog/1077160
         # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.15

@@ -7,8 +7,14 @@ import collections, datetime, os, pexpect, re, sys, time
 class driver:
     def __init__(self, options, target):
         self.options = options
-        self.rbx = target
         self.target = target
+
+        self.rbx = target
+        self.end = ""
+        self.hb = self.rbx.startswith("HB")
+        self.he = self.rbx.startswith("HE")
+        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
+        self.assign_sector_host_port()
 
         self.connect()
         self.guardians()
@@ -17,6 +23,36 @@ class driver:
 
     def enable(self):
         pass
+
+
+    def assign_sector_host_port(self):
+        host = "localhost"
+
+        if self.hb:
+            port = 64400
+            if self.end in "MP":
+                host = "hcalngccm03"
+                self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                host = "hcal904daq04"
+        elif self.he:
+            if self.end in "MP":
+                host = "hcalngccm02"
+                port = 64000
+                self.sector = sector(self.rbx)
+            else:  # assume 904
+                self.sector = sector(self.rbx, True)
+                host = "hcal904daq04"
+                port = 64400
+        elif self.hf:
+            self.sector = sector(self.rbx)
+            host = "hcalngccm01"
+            port = 63000
+
+        # driver.connect assumes these are included as options
+        self.options.host = host
+        self.options.port = port
 
 
     def errors(self, store=True, letter="", fec=True, ccm=True, sleep=True, old=False):

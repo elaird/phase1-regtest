@@ -81,34 +81,6 @@ class scanner(driver.driver):
         self.disconnect()
 
 
-    def assign_sector_host_port(self):
-        host = "localhost"
-        port = 64000
-
-        if self.hb:
-            if self.end in "MP":
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                host = "hcal904daq04"
-                port = 64400 if self.sector else 64000
-        elif self.he:
-            if self.end in "MP":
-                host = "hcalngccm02"
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                host = "hcal904daq04"
-        elif self.hf:
-            self.sector = sector(self.rbx)
-            host = "hcalngccm01"
-            port = 63000
-
-        # driver.connect assumes these are included as options
-        self.options.host = host
-        self.options.port = port
-
-
     def split_results(self, cmd):
         res = self.command(cmd)
         fields = res.split("#")
