@@ -79,12 +79,12 @@ def opts(full_rbx=False):
     parser.add_option("-H",
                       "--host",
                       dest="host",
-                      default="localhost",
+                      default="",
                       help="ngccmserver host [default %default]")
     parser.add_option("-p",
                       "--port",
                       dest="port",
-                      default=64000,
+                      default=0,
                       type="int",
                       help="ngccmserver port number [default %default]")
     parser.add_option("--stp-igloo-HE",
@@ -219,6 +219,9 @@ class programmer(driver.driver):
         self.target, self.rbx = check_target(target)
         self.target0 = self.target.split("-")[0]
 
+        if not (self.options.host and self.options.port):
+            self.assign_sector_host_port()
+
         self.connect(quiet=self.options.deviceInfoOnly)
 
         for name in functions:
@@ -229,7 +232,7 @@ class programmer(driver.driver):
 
     def wait(self):
         if self.options.program:
-            time.sleep(5)
+            time.sleep(10)
 
 
     def check_version(self):
