@@ -119,14 +119,6 @@ class commissioner(driver.driver):
         if not self.options.logfile:
             self.options.logfile = self.rbx + ".log"
 
-        self.hb = self.rbx.startswith("HB")
-        self.he = self.rbx.startswith("HE")
-        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
-        if len(self.rbx) <= 2:
-            sys.exit("The RBX must contain at least three characters.")
-        else:
-            self.end = self.rbx[2]
-
         self.assign_sector_host_port()
 
         fe = False

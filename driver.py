@@ -33,10 +33,6 @@ class driver:
         self.target = target
 
         self.rbx = target
-        self.end = ""
-        self.hb = self.rbx.startswith("HB")
-        self.he = self.rbx.startswith("HE")
-        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
         self.assign_sector_host_port()
 
         self.connect()
@@ -49,8 +45,16 @@ class driver:
 
 
     def assign_sector_host_port(self):
-        host = "localhost"
+        self.hb = self.rbx.startswith("HB")
+        self.he = self.rbx.startswith("HE")
+        self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
 
+        if len(self.rbx) <= 2:
+            sys.exit("The RBX must contain at least three characters.")
+        else:
+            self.end = self.rbx[2]
+
+        host = "localhost"
         if self.hb:
             port = 64400
             if self.end in "MP":

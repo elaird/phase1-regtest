@@ -63,20 +63,9 @@ class scanner(driver.driver):
         self.options = options
         self.options.logfile = self.target + ".log"
 
-        self.hb = self.rbx.startswith("HB")
-        self.he = self.rbx.startswith("HE")
-
-        if len(self.rbx) <= 2:
-            sys.exit("The RBX must contain at least three characters.")
-        else:
-            self.end = self.rbx[2]
-
         self.assign_sector_host_port()
-
         self.connect()
-
         self.pickle(self.bv_scan())
-
         self.disconnect()
 
 
