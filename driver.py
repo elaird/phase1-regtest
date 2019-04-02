@@ -54,28 +54,22 @@ class driver:
         else:
             self.end = self.rbx[2]
 
-        host = "localhost"
-        if self.hb:
-            port = 64400
-            if self.end in "MP":
-                host = "hcalngccm03"
-                self.sector = sector(self.rbx)
+        usc = self.end in "MPsC"
+        self.sector = sector(self.rbx, not usc)
+
+        if self.hb or self.he:
+            if usc:
+                host = "hcalngccm03" if self.hb else "hcalngccm02"
+                port = 64400 if self.hb else 64000
             else:  # assume 904
-                self.sector = sector(self.rbx, True)
-                host = "hcal904daq04"
-        elif self.he:
-            if self.end in "MP":
-                host = "hcalngccm02"
-                port = 64000
-                self.sector = sector(self.rbx)
-            else:  # assume 904
-                self.sector = sector(self.rbx, True)
                 host = "hcal904daq04"
                 port = 64400
         elif self.hf:
-            self.sector = sector(self.rbx)
-            host = "hcalngccm01"
-            port = 63000
+            host = "hcalngccm01" if usc else "hcal904daq02"
+            port = 63000 if usc else 63700
+        else:
+            host = "localhost"
+            port = 0
 
         # driver.connect assumes these are included as options
         self.options.host = host
@@ -107,7 +101,11 @@ class driver:
         else:
             fec_cmd = "get %s-fec_[rx_rs_err,dv_down]_cnt_rr" % target0
         ccm_cmd = "get %s-mezz_rx_[prbs,rsdec]_error_cnt_rr" % target0
-        b2b_cmd = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
+
+        if self.hb or self.he:
+            b2b_cmd = "get %s-[,s]b2b_rx_[prbs,rsdec]_error_cnt_rr" % target0
+        else:
+            b2b_cmd = ccm_cmd  # HF has no b2b
 
         if store:
             if fec:
