@@ -241,6 +241,9 @@ class commissioner(driver.driver):
             if self.rbx == "ZDCP":
                 fecs = "hffec3"
                 sfp = 7
+            if self.rbx == "HF17":
+                fecs = "hffec4"
+                sfp = 2
         elif self.hb:
             if self.end == "M":
                 fecs = "hbfec5"
@@ -353,10 +356,12 @@ class commissioner(driver.driver):
             lst = [("mezz_GEO_ADDR", 2, None),
                    ("mezz_FPGA_SILSIG_rr", fw15, None),
                    ("smezz_FPGA_SILSIG_rr", fw14, None)]
-        for iSw in range(4):
-            lst.append(("mezz_TEST_SW%d" % iSw, (sw14 if self.options.j14 else sw15)[iSw], None))
-        for iSw in range(4):
-            lst.append(("smezz_TEST_SW%d" % iSw, (sw15 if self.options.j14 else sw14)[iSw], None))
+
+        if self.hb or self.he:
+            for iSw in range(4):
+                lst.append(("mezz_TEST_SW%d" % iSw, (sw14 if self.options.j14 else sw15)[iSw], None))
+            for iSw in range(4):
+                lst.append(("smezz_TEST_SW%d" % iSw, (sw15 if self.options.j14 else sw14)[iSw], None))
 
         if self.hb:
             lst += [("mezz_MASTER_B_ENABLE_rr", None, None),
@@ -365,17 +370,19 @@ class commissioner(driver.driver):
             lst += [("mezz_MASTER_J14_ENABLE_rr", None, None),
                     ("smezz_MASTER_J14_ENABLE_rr", None, None)]
 
-        lst += [("mezz_PELTIER_DISABLE_CNTR", 5, 5),
-                ("b2b_PELTIER_DISABLE_CNTR", 5, 5),
-                ("mezz_PWR_ENABLE_CNTR", 5, 5),
-                ("b2b_PWR_ENABLE_CNTR", 5, 5)]
+        if self.hb or self.he:
+            lst += [("mezz_PELTIER_DISABLE_CNTR", 5, 5),
+                    ("b2b_PELTIER_DISABLE_CNTR", 5, 5),
+                    ("mezz_PWR_ENABLE_CNTR", 5, 5),
+                    ("b2b_PWR_ENABLE_CNTR", 5, 5)]
 
         if self.hb:
             prefix = "b" if self.options.j14 else "a"
         elif self.he:
             prefix = "J14_" if self.options.j14 else "J15_"
 
-        lst.append(("vtrx_rssi_%sCntrl_f_rr" % prefix, current, currentE))
+        if self.hb or self.he:
+            lst.append(("vtrx_rssi_%sCntrl_f_rr" % prefix, current, currentE))
 
         # temp = 35.0
         # tempE = 5.0
@@ -412,7 +419,7 @@ class commissioner(driver.driver):
             print("| CCM |")
             print("-" * 7)
             self.check(lst)
-            self.errors(fec=False, old=not self.sector)
+            self.errors(fec=False, old=(self.hf or not self.sector))
 
 
     def bv_scan(self):
