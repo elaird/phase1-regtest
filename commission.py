@@ -87,6 +87,11 @@ def opts():
                       default=False,
                       action="store_true",
                       help="continue even when encountering error condions")
+    parser.add_option("--bat28",
+                      dest="bat28",
+                      default=False,
+                      action="store_true",
+                      help="apply customizations for Bat. 28")
 
     options, args = parser.parse_args()
 
@@ -119,7 +124,7 @@ class commissioner(driver.driver):
         if not self.options.logfile:
             self.options.logfile = self.rbx + ".log"
 
-        self.assign_sector_host_port()
+        self.assign_sector_host_port(default=self.options.bat28)
 
         fe = False
         for attr in dir(self.options):
@@ -266,6 +271,10 @@ class commissioner(driver.driver):
                 elif self.sector == 13:
                     fecs = "hbfec5"
                     sfp = 9
+
+        if self.options.bat28:
+            fecs = "fec1"
+            sfp = 1
 
         print("")
         print("-" * 7)
