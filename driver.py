@@ -44,7 +44,7 @@ class driver:
         pass
 
 
-    def assign_sector_host_port(self):
+    def assign_sector_host_port(self, default=False):
         self.hb = self.rbx.startswith("HB")
         self.he = self.rbx.startswith("HE")
         self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
@@ -67,9 +67,10 @@ class driver:
         elif self.hf:
             host = "hcalngccm01" if usc else "hcal904daq02"
             port = 63000 if usc else 63700
-        else:
+
+        if default:
             host = "localhost"
-            port = 0
+            port = 64000
 
         # driver.connect assumes these are included as options
         self.options.host = host
@@ -185,7 +186,7 @@ class driver:
         self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
         self.logfile.write(h)
 
-        os.system("killall ngccm >& /dev/null")
+        # os.system("killall ngccm >& /dev/null")
         self.server = pexpect.spawn("ngFEC.exe -z -c -t -p %d -H %s" % (self.options.port, self.options.host))
         self.server.logfile = self.logfile
         self.server.sendline("")
