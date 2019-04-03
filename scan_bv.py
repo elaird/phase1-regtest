@@ -46,6 +46,11 @@ def opts(multi_target=False):
                       default=1,
                       type="int",
                       help="step size (V) [default %default]")
+    parser.add_option("--default-server",
+                      dest="defaultServer",
+                      default=False,
+                      action="store_true",
+                      help="connect to default server in driver.py")
 
     options, args = parser.parse_args()
 
@@ -63,7 +68,7 @@ class scanner(driver.driver):
         self.options = options
         self.options.logfile = self.target + ".log"
 
-        self.assign_sector_host_port()
+        self.assign_sector_host_port(default=self.options.defaultServer)
         self.connect()
         self.pickle(self.bv_scan())
         self.disconnect()
