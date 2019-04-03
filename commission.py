@@ -622,14 +622,14 @@ class commissioner(driver.driver):
 
             print("Crate %d Slot %2d" % (crate, slot))
             link_headers = link[19:]
-            # https://github.com/elaird/hcalraw/blob/master/data/ref_2018.txt
+            # https://github.com/elaird/hcalraw/blob/master/data/ref_2019.txt
             if self.hb or self.he:
                 s3 = slot % 3
                 if s3 == 1:
                     if ppod:
-                        link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20      rx21      rx22      rx23     "
+                        link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20(1-8) rx21(2-8) rx22(3-8) rx23(4-8)"
                     else:
-                        link_headers = " rx00      rx01      rx02      rx03      rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
+                        link_headers = " rx00(1-1) rx01(2-1) rx02(3-1) rx03(4-1) rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
                 elif s3 == 2:
                     if ppod:
                         link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
@@ -714,9 +714,9 @@ class commissioner(driver.driver):
         if (slot % 3) == 1:
             if ppod:
                 iStart = 0
-                iEnd = 8
+                iEnd = 12
             else:
-                iStart = 4
+                iStart = 0
                 iEnd = 12
         if (slot % 3) == 2:
             if ppod:
