@@ -182,7 +182,7 @@ class commissioner(driver.driver):
 
 
     def fec(self):
-        # USC: http://cmsonline.cern.ch/cms-elog/1077160
+        # USC: http://cmsonline.cern.ch/cms-elog/1082901
         # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.15
 
         # hbhe_full = (3, 1, 2, 0x14032018)
@@ -197,7 +197,7 @@ class commissioner(driver.driver):
             if self.end == "M":
                 if self.sector in [9, 29]:
                     fw = hbhe_full
-                    fecs = "hefec7"
+                    fecs = "hefec1"
                     sfp = 7 if self.sector == 9 else 3
                 elif self.sector <= 12:
                     fecs = "hefec2"
@@ -208,7 +208,7 @@ class commissioner(driver.driver):
             if self.end == "P":
                 if self.sector in [10, 30]:
                     fw = hbhe_full
-                    fecs = "hefec7"
+                    fecs = "hefec1"
                     sfp = 6 if self.sector == 10 else 2
                 elif self.sector <= 6:
                     fecs = "hefec3"
@@ -251,13 +251,16 @@ class commissioner(driver.driver):
                 sfp = 2
         elif self.hb:
             if self.end == "M":
-                fecs = "hbfec5"
-                if self.sector == 18:
-                    sfp = 1
-                if self.sector == 10:
-                    sfp = 3
-                if self.sector == 11:
-                    sfp = 5
+                offset = 1
+                if 1 <= self.sector <= 6:
+                    fecs = "hbfec5"
+                elif 7 <= self.sector <= 12:
+                    fecs = "hbfec6"
+                    offset += 12
+                elif 13 <= self.sector <= 18:
+                    fecs = "hbfec7"
+                    offset += 24
+                sfp = 2 * self.sector - offset
             else:  # 904
                 if self.sector == 0:
                     fecs = "hbfec5"
