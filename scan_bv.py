@@ -4,26 +4,6 @@ import driver
 import datetime, optparse, os, pickle, sys, time
 
 
-def check_target(target):
-    coords = target.split("-")
-    fail = "Expected RBX-RM.  Found %s" % str(target)
-
-    if len(coords) != 2:
-        sys.exit(fail)
-
-    rbx, rm_s = coords
-
-    if not (rbx.startswith("HB") or rbx.startswith("HE")):
-        sys.exit("This script only works with HB or HE RBXes.")
-
-    try:
-        rm = int(rm_s)
-    except ValueError:
-        sys.exit("Could not convert '%s' to an int." % rm_s)
-
-    return target, rbx
-
-
 def opts(multi_target=False):
     parser = optparse.OptionParser(usage="usage: %prog [options] RBX-RM")
     parser.add_option("--nseconds",
@@ -63,7 +43,7 @@ def opts(multi_target=False):
 
 class scanner(driver.driver):
     def __init__(self, options, args):
-        self.target, self.rbx = check_target(args[0])
+        self.assign_target(args[0])
 
         self.options = options
         self.options.logfile = self.target + ".log"
@@ -72,6 +52,27 @@ class scanner(driver.driver):
         self.connect()
         self.pickle(self.bv_scan())
         self.disconnect()
+
+
+    def assign_target(self, target):
+        coords = target.split("-")
+        fail = "Expected RBX-RM.  Found %s" % str(target)
+
+        if len(coords) != 2:
+            sys.exit(fail)
+
+        rbx, rm_s = coords
+
+        if not (rbx.startswith("HB") or rbx.startswith("HE")):
+            sys.exit("This script only works with HB or HE RBXes.")
+
+        try:
+            rm = int(rm_s)
+        except ValueError:
+            sys.exit("Could not convert '%s' to an int." % rm_s)
+
+        self.target = target
+        self.rbx = rbx
 
 
     def split_results(self, cmd):
