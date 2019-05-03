@@ -26,6 +26,11 @@ def opts(multi_target=False):
                       default=0.05,
                       type="float",
                       help="step size (V) [default %default]")
+    parser.add_option("--default-server",
+                      dest="defaultServer",
+                      default=False,
+                      action="store_true",
+                      help="connect to default server in driver.py")
 
     options, args = parser.parse_args()
 
@@ -36,8 +41,15 @@ def opts(multi_target=False):
     return options, args
 
 
-class scanner_peltier(scan_bv.scanner):
-    def bv_scan(self):
+class scanner_peltier(scan_bv.scanner_bv):
+    def assign_target(self, rbx):
+        if not (rbx.startswith("HB") or rbx.startswith("HE")):
+            sys.exit("This script only works with HB or HE RBXes.")
+        self.target = rbx
+        self.rbx = rbx
+
+
+    def scan(self):
         nRm = 4
 
         d = {}
