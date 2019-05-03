@@ -5,7 +5,7 @@ import optparse, time
 
 
 def opts(multi_target=False):
-    parser = optparse.OptionParser(usage="usage: %prog [options] RBX-RM")
+    parser = optparse.OptionParser(usage="usage: %prog [options] RBX")
     parser.add_option("--nseconds",
                       dest="nSeconds",
                       default=2,
