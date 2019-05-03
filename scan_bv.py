@@ -41,7 +41,7 @@ def opts(multi_target=False):
     return options, args
 
 
-class scanner(driver.driver):
+class scanner_bv(driver.driver):
     def __init__(self, options, args):
         self.assign_target(args[0])
 
@@ -50,7 +50,7 @@ class scanner(driver.driver):
 
         self.assign_sector_host_port(default=self.options.defaultServer)
         self.connect()
-        self.pickle(self.bv_scan())
+        self.pickle(self.scan())
         self.disconnect()
 
 
@@ -93,7 +93,7 @@ class scanner(driver.driver):
         return fields[0], results
 
 
-    def bv_scan(self):
+    def scan(self):
         nCh = 48 if self.he else 64
 
         d = {}
@@ -119,4 +119,4 @@ class scanner(driver.driver):
 
 
 if __name__ == "__main__":
-    p = scanner(*opts())
+    p = scanner_bv(*opts())
