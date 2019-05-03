@@ -16,9 +16,10 @@ def results(filename):
         return {}
 
 
-def vi_dicts(inFile, current_string="LeakageCurrent", voltage_string="biasmon"):
+def vi_dicts(inFile, current_string="LeakageCurrent", voltage_string="biasmon", temperature_string="rtdtemperature"):
     voltage = {}
     current = {}
+    temperature = {}
     for key, res in results(inFile).items():
         vSet, cmd = key
         if "OK" in res:
@@ -27,64 +28,41 @@ def vi_dicts(inFile, current_string="LeakageCurrent", voltage_string="biasmon"):
             current[float(vSet)] = res
         if voltage_string in cmd:
             voltage[float(vSet)] = res
-    return voltage, current
+        if temperature_string in cmd:
+            temperature[float(vSet)] = res
+    return voltage, current, temperature
 
 
-def graphs(inFile, nCh, options, biasMonUnc, leakUnc, biasMin, leakMin):
-    g_voltages      = []
-    factor_voltages = []
-    min_bv_voltages = []
+def graphs(inFile, nCh, options, settings, d_values, vMin, vUnc):
+    g_values      = []
+    factor_values = []
+    min_bv_values = []
 
-    g_currents      = []
-    factor_currents = []
-    min_bv_currents = []
     for iCh in range(nCh):
-        g_voltages.append(r.TGraphErrors())
-        factor_voltages.append(-1)
-        min_bv_voltages.append(None)
+        g_values.append(r.TGraphErrors())
+        factor_values.append(-1)
+        min_bv_values.append(None)
 
-        g_currents.append(r.TGraphErrors())
-        factor_currents.append(-1)
-        min_bv_currents.append(None)
-
-    d_voltages, d_currents = vi_dicts(inFile, current_string="PeltierCurrent_", voltage_string="PeltierVoltage_")
-    settings = sorted(d_voltages.keys())
     for iSetting, setting in enumerate(settings):
-        voltages = d_voltages[setting]
-        currents = d_currents[setting]
+        values = d_values[setting]
 
         for iCh in range(nCh):
-            iPoint = g_voltages[iCh].GetN()
-            g_voltages[iCh].SetPoint(iPoint, setting, voltages[iCh])
-            g_voltages[iCh].SetPointError(iPoint, 0.0, biasMonUnc)
+            iPoint = g_values[iCh].GetN()
+            g_values[iCh].SetPoint(iPoint, setting, values[iCh])
+            g_values[iCh].SetPointError(iPoint, 0.0, vUnc)
 
             for setting2 in settings:
-                denom = d_voltages[setting2][iCh]
+                denom = d_values[setting2][iCh]
                 if denom:
-                    factor = voltages[iCh] / denom
+                    factor = values[iCh] / denom
                     break
 
-            good = biasMin < voltages[iCh] and options.pedFactor < factor
-            if min_bv_voltages[iCh] is None and (good or options.bvMaxMin <= setting):
-                min_bv_voltages[iCh] = settings[iSetting]
-                factor_voltages[iCh] = factor
+            good = vMin < values[iCh] and options.pedFactor < factor
+            if min_bv_values[iCh] is None and (good or options.bvMaxMin <= setting):
+                min_bv_values[iCh] = settings[iSetting]
+                factor_values[iCh] = factor
 
-            iPoint = g_currents[iCh].GetN()
-            g_currents[iCh].SetPoint(iPoint, setting, currents[iCh])
-            g_currents[iCh].SetPointError(iPoint, 0.0, leakUnc)
-
-            for setting2 in settings:
-                denom = d_currents[setting2][iCh]
-                if denom:
-                    factor = currents[iCh] / denom
-                    break
-
-            good = leakMin < currents[iCh] and options.pedFactor < factor
-            if min_bv_currents[iCh] is None and (good or options.bvMaxMin <= setting):
-                min_bv_currents[iCh] = settings[iSetting]
-                factor_currents[iCh] = factor
-
-    return g_voltages, min_bv_voltages, factor_voltages, g_currents, min_bv_currents, factor_currents
+    return g_values, min_bv_values, factor_values
 
 
 def fit_results(f):
@@ -170,11 +148,11 @@ def histogram_fit_results(lst, mins, factors,
                 printer.cyan("%s has fit rel unc %g" % (s, rel_unc))
 
 
-def draw_per_channel(lst, yTitle, yMax, can, outFile, options, fColor1=r.kRed, fColor2=r.kGreen):
+def draw_per_channel(lst, yTitle, xMin, yMax, can, outFile, options, fColor1=r.kRed, fColor2=r.kGreen):
     can.Clear()
     can.DivideSquare(len(lst), 0.003, 0.001)
     
-    null = r.TH2D("null", ";PVset(V) ;%s" % yTitle, 1, 0.0, options.bvMax, 1, 0.0, yMax)
+    null = r.TH2D("null", ";PVset(V) ;%s" % yTitle, 1, xMin, options.bvMax, 1, 0.0, yMax)
     null.SetStats(False)
 
     x = null.GetXaxis()
@@ -290,6 +268,12 @@ def opts():
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for I uncertainties [default %default]")
+    parser.add_option("--lsb-factor-temperature",
+                      dest="lsbFactorTemperature",
+                      default=1.0,
+                      type="float",
+                      metavar="f",
+                      help="multiple of LSB used for I uncertainties [default %default]")
     parser.add_option("--lsb-factor-voltage",
                       dest="lsbFactorVoltage",
                       default=0.48,
@@ -367,21 +351,30 @@ def one(inFile, options, h):
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
-    g_voltages, min_bv_voltages, factor_voltages,\
-    g_currents, min_bv_currents, factor_currents = graphs(inFile, nCh, options,
-                                                          biasMonLsb*options.lsbFactorVoltage,
-                                                          leakLsb*options.lsbFactorCurrent,
-                                                          biasMin*1.001, leakMin*1.001)
+
+    d_voltages, d_currents, d_temperatures = vi_dicts(inFile, current_string="PeltierCurrent_", voltage_string="PeltierVoltage_")
+
+    settings = sorted(d_voltages.keys())
+    g_voltages, min_bv_voltages, factor_voltages = graphs(inFile, nCh, options, settings,
+                                                          d_voltages, biasMin*1.001, biasMonLsb*options.lsbFactorVoltage)
+
+    g_currents, min_bv_currents, factor_currents = graphs(inFile, nCh, options, settings,
+                                                          d_currents, leakMin*1.001, leakLsb*options.lsbFactorCurrent)
+
+    g_temperatures, min_bv_temperatures, factor_temperatures = graphs(inFile, nCh, options, settings,  # FIXME: min/unc
+                                                                      d_temperatures, leakMin*1.001, leakLsb*options.lsbFactorTemperature)
+
 
     p_voltages = fits(g_voltages, min_bv_voltages, options, target,  1.0)
     p_currents = fits(g_currents, min_bv_currents, options, target, 0.15)
+    p_temperatures = fits(g_temperatures, min_bv_temperatures, options, target, 0.0)
 
     if not p_voltages:
         return
 
     can = r.TCanvas("canvas", "canvas", 8000, 6000)
     can.Print(outFile + "[")
-    draw_per_channel(g_voltages, "PVmeas(V)", options.bvMax, can, outFile, options, fColor1=r.kBlue+3, fColor2=r.kCyan)
+    draw_per_channel(g_voltages, "PVmeas(V)", -0.5, options.bvMax, can, outFile, options, fColor1=r.kBlue+3, fColor2=r.kCyan)
     histogram_fit_results(p_voltages, min_bv_voltages, factor_voltages,
                           options, target,
                           h["V_npoints"], h["V_mins"], h["V_factors"],
@@ -391,8 +384,8 @@ def one(inFile, options, h):
                           h["V_slopes"], h["V_slopes_unc_rel"],
                           warn=False)
     histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="PV meas", unit="V")
-                          
-    draw_per_channel(g_currents, "Imeas(A) ", options.bvMax / 2.0, can, outFile, options)
+
+    draw_per_channel(g_currents, "Imeas(A) ", -0.5, options.bvMax / 2.0, can, outFile, options)
     histogram_fit_results(p_currents, min_bv_currents, factor_currents,
                           options, target,
                           h["I_npoints"], h["I_mins"], h["I_factors"],
@@ -400,8 +393,18 @@ def one(inFile, options, h):
                           h["I_delta_chi2"], h["I_delta_chi2_cut_vs_ch"],
                           h["I_offsets"], h["I_offsets_unc"],
                           h["I_slopes"], h["I_slopes_unc_rel"])
-
     # histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="Imeas", unit="A")
+
+    draw_per_channel(g_temperatures, "T(C) ", -0.5, options.bvMax * 5.0, can, outFile, options)
+    histogram_fit_results(p_temperatures, min_bv_temperatures, factor_temperatures,
+                          options, target,
+                          h["T_npoints"], h["T_mins"], h["T_factors"],
+                          h["T_pvalues"], h["T_pvalues2"],
+                          h["T_delta_chi2"], h["T_delta_chi2_cut_vs_ch"],
+                          h["T_offsets"], h["T_offsets_unc"],
+                          h["T_slopes"], h["T_slopes_unc_rel"])
+    # histogram_fit_results_vs_channel(p_temperatures, nCh, can, outFile, target=target, title="T", unit="C")
+
     can.Print(outFile + "]")
     printer.gray("Wrote %s" % outFile)
     return True
@@ -489,28 +492,40 @@ def histos(options):
     delta_chi2 = "#chi^{2}_{0} - #chi^{2}_{c*}"
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "I_npoints": ("I;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
+                        "T_npoints": ("T;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
                         "V_mins": ("V;fit min PV;channels / bin", (80, 0.0, 80.0)),
                         "I_mins": ("I;fit min PV;channels / bin", (80, 0.0, 80.0)),
+                        "T_mins": ("T;fit min PV;channels / bin", (80, 0.0, 80.0)),
                         "V_factors": ("V;fit min V / V0;channels / bin", (100, 0.0, options.bvMax)),
                         "I_factors": ("I;fit min I / I0;channels / bin", (100, 0.0, options.bvMax)),
+                        "T_factors": ("T;fit min T / T0;channels / bin", (100, 0.0, options.bvMax)),
                         "V_pvalues": ("V;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues": ("I;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
+                        "T_pvalues": ("T;fit p-value 1;channels / bin", (202, 0.0, 1.01)),
                         "V_pvalues2": ("V;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
                         "I_pvalues2": ("I;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
+                        "T_pvalues2": ("T;fit p-value 2;channels / bin", (202, 0.0, 1.01)),
                         "V_chi2": ("V;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
                         "I_chi2": ("I;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
+                        "T_chi2": ("T;fit #chi^{2}_{0};channels / bin", (nChi2, -10.0, 100.0)),
                         "V_delta_chi2": ("V;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
                         "I_delta_chi2": ("I;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
+                        "T_delta_chi2": ("T;%s;channels / bin" % delta_chi2, (nChi2, -1.0, 200.0)),
                         "V_delta_chi2_cut_vs_ch": ("V (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "I_delta_chi2_cut_vs_ch": ("I (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
+                        "T_delta_chi2_cut_vs_ch": ("T (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
                         "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
+                        "T_offsets": ("T;fit offset (C);channels / bin", (200, -50.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.007)),
                         "I_offsets_unc": ("I;uncertainty on fit offset (uA);channels / bin", (200, 0.0, 5.0)),
+                        "T_offsets_unc": ("T;uncertainty on fit offset (C);channels / bin", (200, 0.0, 5.0)),
                         "V_slopes": ("V;fit slope  (V/V);channels / bin", (200, 0.90, 1.01)),
                         "I_slopes": ("I;fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
+                        "T_slopes": ("T;fit slope (C/V);channels / bin", (200, 0.00, 0.50)),
                         "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
                         "I_slopes_unc_rel": ("I;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
+                        "T_slopes_unc_rel": ("T;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
     }.items():
         if len(b) == 3:
             out[key] = r.TH1D(key, t, *b)
