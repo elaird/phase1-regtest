@@ -266,10 +266,10 @@ class commissioner(driver.driver):
                     fecs = "hbfec5"
                     sfp = 7
                 if 1 <= self.sector <= 6:
-                    fecs = "hbfec3"
+                    fecs = "hbfec1"
                     sfp = 2 * self.sector - 1
                 elif 7 <= self.sector <= 12:
-                    fecs = "hbfec4"
+                    fecs = "hbfec2"
                     sfp = 2 * (self.sector - 6) - 1
                 elif self.sector == 13:
                     fecs = "hbfec5"
