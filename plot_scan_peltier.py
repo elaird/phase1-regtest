@@ -148,11 +148,11 @@ def histogram_fit_results(lst, mins, factors,
                 printer.cyan("%s has fit rel unc %g" % (s, rel_unc))
 
 
-def draw_per_channel(lst, yTitle, xMin, yMax, can, outFile, options, fColor1=r.kRed, fColor2=r.kGreen):
+def draw_per_channel(lst, yTitle, can, outFile, options, xMin=0.0, yMin=0.0, yMax=10.0, fColor1=None, fColor2=None):
     can.Clear()
     can.DivideSquare(len(lst), 0.003, 0.001)
     
-    null = r.TH2D("null", ";PVset(V) ;%s" % yTitle, 1, xMin, options.bvMax, 1, 0.0, yMax)
+    null = r.TH2D("null", ";PVset(V) ;%s" % yTitle, 1, xMin, options.bvMax, 1, yMin, yMax)
     null.SetStats(False)
 
     x = null.GetXaxis()
@@ -181,17 +181,19 @@ def draw_per_channel(lst, yTitle, xMin, yMax, can, outFile, options, fColor1=r.k
         keep.append(text.DrawText(0.28, 0.75, "RM%d" % mb))
 
         g = lst[iCh]
-        # f2 = g.GetFunction("f2")
-        # f2.SetNpx(1000)
-        # f2.SetLineWidth(1)
-        # f2.SetLineColor(fColor2)
-        # f2.Draw("same")
+        if fColor2 is not None:
+            f2 = g.GetFunction("f2")
+            f2.SetNpx(1000)
+            f2.SetLineWidth(1)
+            f2.SetLineColor(fColor2)
+            f2.Draw("same")
 
-        f1 = g.GetFunction("f1")
-        f1.SetNpx(1000)
-        f1.SetLineWidth(1)
-        f1.SetLineColor(fColor1)
-        f1.Draw("same")
+        if fColor1 is not None:
+            f1 = g.GetFunction("f1")
+            f1.SetNpx(1000)
+            f1.SetLineWidth(1)
+            f1.SetLineColor(fColor1)
+            f1.Draw("same")
 
         g.SetMarkerStyle(20)
         g.SetMarkerSize(1.0)
@@ -374,7 +376,9 @@ def one(inFile, options, h):
 
     can = r.TCanvas("canvas", "canvas", 8000, 6000)
     can.Print(outFile + "[")
-    draw_per_channel(g_voltages, "PVmeas(V)", -0.5, options.bvMax, can, outFile, options, fColor1=r.kBlue+3, fColor2=r.kCyan)
+    draw_per_channel(g_voltages, "PVmeas(V)", can, outFile, options,
+                     xMin=-0.5, yMin=0.0, yMax=options.bvMax,
+                     fColor1=r.kBlue+3) #, fColor2=r.kCyan)
     histogram_fit_results(p_voltages, min_bv_voltages, factor_voltages,
                           options, target,
                           h["V_npoints"], h["V_mins"], h["V_factors"],
@@ -383,9 +387,10 @@ def one(inFile, options, h):
                           h["V_offsets"], h["V_offsets_unc"],
                           h["V_slopes"], h["V_slopes_unc_rel"],
                           warn=False)
-    histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="PV meas", unit="V")
+    # histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="PV meas", unit="V")
 
-    draw_per_channel(g_currents, "Imeas(A) ", -0.5, options.bvMax / 2.0, can, outFile, options)
+    draw_per_channel(g_currents, "Imeas(A) ", can, outFile, options,
+                     xMin=-0.5, yMin=0.0, yMax=options.bvMax / 2.0, fColor1=r.kRed)
     histogram_fit_results(p_currents, min_bv_currents, factor_currents,
                           options, target,
                           h["I_npoints"], h["I_mins"], h["I_factors"],
@@ -395,7 +400,8 @@ def one(inFile, options, h):
                           h["I_slopes"], h["I_slopes_unc_rel"])
     # histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="Imeas", unit="A")
 
-    draw_per_channel(g_temperatures, "T(C) ", -0.5, options.bvMax * 5.0, can, outFile, options)
+    draw_per_channel(g_temperatures, "T(C)", can, outFile, options,
+                     xMin=-0.5, yMin=-10.0, yMax=options.bvMax * 5.0)
     histogram_fit_results(p_temperatures, min_bv_temperatures, factor_temperatures,
                           options, target,
                           h["T_npoints"], h["T_mins"], h["T_factors"],
