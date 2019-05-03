@@ -59,7 +59,7 @@ class scanner_peltier(scan_bv.scanner_bv):
         v = self.options.bvMin
         while (v <= self.options.bvMax):
             for cmd in ["put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, v),
-                        # "get %s-[1-%d]-PeltierVoltageMon_f_rr" % (self.rbx, nRm),
+                        "get %s-[1-%d]-rtdtemperature_f_rr" % (self.rbx, nRm),
                         "get %s-[1-%d]-PeltierCurrent_f_rr" % (self.rbx, nRm),
                         "get %s-[1-%d]-PeltierVoltage_f_rr" % (self.rbx, nRm),
                         ]:
