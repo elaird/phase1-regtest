@@ -78,7 +78,7 @@ class scanner_peltier(scan_bv.scanner_bv):
                         "get %s-[1-%d]-PeltierCurrent_f_rr" % (self.rbx, nRm),
                         "get %s-[1-%d]-PeltierVoltage_f_rr" % (self.rbx, nRm),
                         ]:
-                if "SetP" in cmd:
+                if "rtd" in cmd:
                     time.sleep(self.options.nSeconds)
                     if iSetting == 0:
                         time.sleep(10 * self.options.nSeconds)
