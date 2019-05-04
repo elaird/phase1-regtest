@@ -112,7 +112,13 @@ class scanner_bv(driver.driver):
 
 
     def pickle(self, d):
-        filename = "%s_%s.pickle" % (self.target, datetime.datetime.today().strftime("%Y_%m_%d_%Hh%M"))
+        filename = "_".join([self.target,
+                             datetime.datetime.today().strftime("%Y_%m_%d_%Hh%M"),
+                             "%ds" % self.options.nSeconds,
+                             ("%4.2fV" % self.options.bvStep).replace(".", "p"),
+                             ])
+        filename += ".pickle"
+
         with open(filename, "w") as f:
             pickle.dump(d, f)
         print("Wrote results to %s" % filename)
