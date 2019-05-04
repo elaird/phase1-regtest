@@ -26,6 +26,11 @@ def opts(multi_target=False):
                       default=0.05,
                       type="float",
                       help="step size (V) [default %default]")
+    parser.add_option("--reverse",
+                      dest="reverse",
+                      default=False,
+                      action="store_true",
+                      help="scan from max down to min")
     parser.add_option("--default-server",
                       dest="defaultServer",
                       default=False,
@@ -49,6 +54,17 @@ class scanner_peltier(scan_bv.scanner_bv):
         self.rbx = rbx
 
 
+    def settings(self):
+        out = []
+        v = self.options.bvMin
+        while (v <= self.options.bvMax):
+            out.append(v)
+            v += self.options.bvStep
+        if self.options.reverse:
+            out.reverse()
+        return out
+
+
     def scan(self):
         nRm = 4
 
@@ -56,8 +72,7 @@ class scanner_peltier(scan_bv.scanner_bv):
 
         self.command("put %s-[1-%d]-peltier_control %d*0" % (self.rbx, nRm, nRm))
 
-        v = self.options.bvMin
-        while (v <= self.options.bvMax):
+        for iSetting, v in enumerate(self.settings()):
             for cmd in ["put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, v),
                         "get %s-[1-%d]-rtdtemperature_f_rr" % (self.rbx, nRm),
                         "get %s-[1-%d]-PeltierCurrent_f_rr" % (self.rbx, nRm),
@@ -65,7 +80,7 @@ class scanner_peltier(scan_bv.scanner_bv):
                         ]:
                 if "SetP" in cmd:
                     time.sleep(self.options.nSeconds)
-                    if v == self.options.bvMin:
+                    if iSetting == 0:
                         time.sleep(10 * self.options.nSeconds)
 
                 d[(v, cmd)] = self.split_results(cmd)[1]
