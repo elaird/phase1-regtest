@@ -157,18 +157,18 @@ def draw_per_channel(lst, yTitle, can, outFile, options, xMin=0.0, yMin=0.0, yMa
 
     x = null.GetXaxis()
     x.SetLabelSize(2.0 * x.GetLabelSize())
-    x.SetTitleSize(4.0 * x.GetTitleSize())
+    x.SetTitleSize(3.0 * x.GetTitleSize())
     x.SetTitleOffset(-0.35)
     # x.CenterTitle()
 
     y = null.GetYaxis()
     y.SetLabelSize(2.0 * y.GetLabelSize())    
-    y.SetTitleSize(4.0 * y.GetTitleSize())
+    y.SetTitleSize(3.0 * y.GetTitleSize())
     y.SetTitleOffset(-0.35)
     # y.CenterTitle()
 
     text = r.TText()
-    text.SetTextSize(3.0 * text.GetTextSize())
+    text.SetTextSize(2.0 * text.GetTextSize())
     text.SetNDC()
     
     keep = []
