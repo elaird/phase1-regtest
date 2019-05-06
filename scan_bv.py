@@ -112,10 +112,15 @@ class scanner_bv(driver.driver):
 
 
     def pickle(self, d):
+        if hasattr(self.options, "time_scan") and self.options.time_scan:
+            voltage = self.options.bvMin
+        else:
+            voltage = self.options.bvStep
+
         filename = "_".join([self.target,
                              datetime.datetime.today().strftime("%Y_%m_%d_%Hh%M"),
                              "%ds" % self.options.nSeconds,
-                             ("%4.2fV" % self.options.bvStep).replace(".", "p"),
+                             ("%4.2fV" % voltage).replace(".", "p"),
                              ])
         filename += ".pickle"
 
