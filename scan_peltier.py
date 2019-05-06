@@ -38,6 +38,7 @@ def opts(multi_target=False):
                       help="connect to default server in driver.py")
 
     options, args = parser.parse_args()
+    options.time_scan = options.bvMin == options.bvMax  # add special mode
 
     if len(args) != 1 and not multi_target:
         parser.print_help()
@@ -55,6 +56,12 @@ class scanner_peltier(scan_bv.scanner_bv):
 
 
     def settings(self):
+        if not self.options.bvStep:
+            return []
+
+        if self.options.time_scan:
+            return [self.options.bvMin] * int(self.options.bvStep)
+
         out = []
         v = self.options.bvMin
         while (v <= self.options.bvMax):
@@ -73,6 +80,9 @@ class scanner_peltier(scan_bv.scanner_bv):
         self.command("put %s-[1-%d]-peltier_control %d*0" % (self.rbx, nRm, nRm))
 
         for iSetting, v in enumerate(self.settings()):
+            if self.options.time_scan:
+                v = iSetting * self.options.nSeconds
+
             for cmd in ["put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, v),
                         "get %s-[1-%d]-rtdtemperature_f_rr" % (self.rbx, nRm),
                         "get %s-[1-%d]-PeltierCurrent_f_rr" % (self.rbx, nRm),
@@ -80,8 +90,11 @@ class scanner_peltier(scan_bv.scanner_bv):
                         ]:
                 if "rtd" in cmd:
                     time.sleep(self.options.nSeconds)
-                    if iSetting == 0:
+                    if iSetting == 0 and not self.options.time_scan:
                         time.sleep(10 * self.options.nSeconds)
+
+                if iSetting and self.options.time_scan and ("SetPeltier" in cmd):
+                    continue
 
                 d[(v, cmd)] = self.split_results(cmd)[1]
             v += self.options.bvStep
@@ -89,6 +102,7 @@ class scanner_peltier(scan_bv.scanner_bv):
         self.command("put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, 0.0))
         self.command("put %s-[1-%d]-peltier_control %d*1" % (self.rbx, nRm, nRm))
         return d
+
 
 if __name__ == "__main__":
     p = scanner_peltier(*opts())
