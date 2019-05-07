@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import optparse, pickle, sys
-import printer
+import printer, scan_peltier
 import ROOT as r
 r.PyConfig.IgnoreCommandLineOptions = True
 
@@ -343,7 +343,7 @@ def one(inFile, options, h):
     biasMonLsb = 0.003663  # V / ADC
     biasMin = 0.0  # ADC = 0
     leakMin = 0.0  # ADC = 0
-    nCh = 4
+    nCh = 4 * scan_peltier.nRbxes(inFile.split("_")[0])
 
     final = inFile.split("/")[-1]
     if final.startswith("HB"):
