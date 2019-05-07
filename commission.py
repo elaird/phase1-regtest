@@ -218,13 +218,13 @@ class commissioner(driver.driver):
                     sfp = self.sector - 6
 
             elif self.rbx == "HE0":
-                fecs = "hbfec5"
+                fecs = "hbfec8"
                 sfp = 1
             elif self.rbx == "HE1":
-                fecs = "hbfec5"
+                fecs = "hbfec8"
                 sfp = 3
             elif self.rbx == "HE1R":
-                fecs = "hbfec5"
+                fecs = "hbfec8"
                 sfp = 4
         elif self.hf:
             fw = (3, 1, 2, 0x16042018)
@@ -263,7 +263,7 @@ class commissioner(driver.driver):
                 sfp = 2 * self.sector - offset
             else:  # 904
                 if self.sector == 0:
-                    fecs = "hbfec5"
+                    fecs = "hbfec8"
                     sfp = 7
                 if 1 <= self.sector <= 6:
                     fecs = "hbfec1"
@@ -272,7 +272,7 @@ class commissioner(driver.driver):
                     fecs = "hbfec2"
                     sfp = 2 * (self.sector - 6) - 1
                 elif self.sector == 13:
-                    fecs = "hbfec5"
+                    fecs = "hbfec8"
                     sfp = 9
 
         if self.options.bat28:
