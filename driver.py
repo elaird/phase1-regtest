@@ -180,7 +180,7 @@ class driver:
     def connect(self, quiet=False):
         self.logfile = open(self.options.logfile, "a")
         if not quiet:
-            printer.gray("Appending to %s (consider doing \"tail -f %s\" in another shell)" % (self.options.logfile, self.options.logfile))
+            printer.gray("Appending to %s" % self.options.logfile)
         h = "-" * 30 + "\n"
         self.logfile.write(h)
         self.logfile.write("| %s |\n" % str(datetime.datetime.today()))
