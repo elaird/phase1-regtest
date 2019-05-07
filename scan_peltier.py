@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import scan_bv
-import optparse, time
+import optparse, sys, time
 
 
-def opts(multi_target=False):
+def opts():
     parser = optparse.OptionParser(usage="usage: %prog [options] RBX")
     parser.add_option("--nseconds",
                       dest="nSeconds",
@@ -40,11 +40,19 @@ def opts(multi_target=False):
     options, args = parser.parse_args()
     options.time_scan = options.bvMin == options.bvMax  # add special mode
 
-    if len(args) != 1 and not multi_target:
+    if len(args) != 1:
         parser.print_help()
         sys.exit(" ")
 
     return options, args
+
+
+def nRbxes(rbx):
+    n = 1
+    if "-" in rbx and "[" in rbx and "]" in rbx:
+        limits = rbx[1 + rbx.find("["):rbx.find("]")].split("-")
+        n += int(limits[1]) - int(limits[0])
+    return n
 
 
 class scanner_peltier(scan_bv.scanner_bv):
@@ -73,20 +81,21 @@ class scanner_peltier(scan_bv.scanner_bv):
 
 
     def scan(self):
-        nRm = 4
+        rms = "[1-4]"
+        nSettings = 4 * nRbxes(self.rbx)
 
         d = {}
 
-        self.command("put %s-[1-%d]-peltier_control %d*0" % (self.rbx, nRm, nRm))
+        self.command("put %s-%s-peltier_control %d*0" % (self.rbx, rms, nSettings))
 
         for iSetting, v in enumerate(self.settings()):
             if self.options.time_scan:
                 v = iSetting * self.options.nSeconds
 
-            for cmd in ["put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, v),
-                        "get %s-[1-%d]-rtdtemperature_f_rr" % (self.rbx, nRm),
-                        "get %s-[1-%d]-PeltierCurrent_f_rr" % (self.rbx, nRm),
-                        "get %s-[1-%d]-PeltierVoltage_f_rr" % (self.rbx, nRm),
+            for cmd in ["put %s-%s-SetPeltierVoltage_f %d*%f" % (self.rbx, rms, nSettings, v),
+                        "get %s-%s-rtdtemperature_f_rr" % (self.rbx, rms),
+                        "get %s-%s-PeltierCurrent_f_rr" % (self.rbx, rms),
+                        "get %s-%s-PeltierVoltage_f_rr" % (self.rbx, rms),
                         ]:
                 if "rtd" in cmd:
                     time.sleep(self.options.nSeconds)
@@ -99,8 +108,8 @@ class scanner_peltier(scan_bv.scanner_bv):
                 d[(v, cmd)] = self.split_results(cmd)[1]
             v += self.options.bvStep
 
-        self.command("put %s-[1-%d]-SetPeltierVoltage_f %d*%f" % (self.rbx, nRm, nRm, 0.0))
-        self.command("put %s-[1-%d]-peltier_control %d*1" % (self.rbx, nRm, nRm))
+        self.command("put %s-%s-SetPeltierVoltage_f %d*%f" % (self.rbx, rms, nSettings, 0.0))
+        self.command("put %s-%s-peltier_control %d*1" % (self.rbx, rms, nSettings))
         return d
 
 

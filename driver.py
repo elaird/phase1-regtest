@@ -5,7 +5,7 @@ import collections, datetime, os, pexpect, re, sys, time
 
 
 def sector(rbx, b904=False):
-    if rbx in ["lasermon", "ZDCM", "ZDCP"]:  # special cases
+    if rbx in ["lasermon", "ZDCM", "ZDCP"] or "-" in rbx:  # special cases
         return None
 
     if rbx[:2] not in ["HB", "HE", "HF"]:
