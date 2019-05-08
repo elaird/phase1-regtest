@@ -101,7 +101,8 @@ def histogram_fit_results(lst, mins, factors,
                           h_delta_chi2, h_delta_chi2_cut_vs_ch,
                           h_offsets, h_offsets_unc,
                           h_slopes, h_slopes_unc_rel,
-                          warn=True):
+                          h_curvatures, h_curvatures_unc,
+                          warn=True, offset2=False, slope2=False):
 
     for iRes, (res, res2) in enumerate(lst):
         ch = 1 + iRes
@@ -128,12 +129,15 @@ def histogram_fit_results(lst, mins, factors,
             if warn:
                 printer.dark_blue("%s has delta chi2 %e" % (s, delta_chi2))
 
-        offset = res[0][0]
+        offset = (res2 if offset2 else res)[0][0]
         h_offsets.Fill(offset)
-        h_offsets_unc.Fill(res[0][1])
+        h_offsets_unc.Fill((res2 if offset2 else res)[0][1])
 
-        slope = res[1][0]
+        slope = (res2 if slope2 else res)[1][0]
         h_slopes.Fill(slope)
+
+        h_curvatures.Fill(res2[2][0])
+        h_curvatures_unc.Fill(res2[2][1])
 
         if options.print_fit_results and slope < 0.80:  # requirement on slope hackily filters V fits
             print("%s %2d %6.3f %6.3f" % (target.split("/")[-1], ch, offset, slope))
@@ -257,7 +261,7 @@ def opts():
     parser = optparse.OptionParser(usage="usage: %prog [options] FILE1 [FILE2 ...]")
     parser.add_option("--bv-max-min",
                       dest="bvMaxMin",
-                      default=3.0,
+                      default=0.0,
                       type="float",
                       help="maximum minimum of fit range [default %default]")
     parser.add_option("--bv-max",
@@ -267,7 +271,7 @@ def opts():
                       help="maximum of fit range [default %default]")
     parser.add_option("--lsb-factor-current",
                       dest="lsbFactorCurrent",
-                      default=0.35,
+                      default=1.0,
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for I uncertainties [default %default]")
@@ -279,7 +283,7 @@ def opts():
                       help="multiple of LSB used for I uncertainties [default %default]")
     parser.add_option("--lsb-factor-voltage",
                       dest="lsbFactorVoltage",
-                      default=0.48,
+                      default=1.0,
                       type="float",
                       metavar="f",
                       help="multiple of LSB used for V uncertainties [default %default]")
@@ -291,7 +295,7 @@ def opts():
                       help="ignore values below f*y0 [default %default]")
     parser.add_option("--summary-file",
                       dest="summaryFile",
-                      default="summary.pdf",
+                      default="fit_summary.pdf",
                       metavar="s",
                       help="summary file [default %default]")
     parser.add_option("--threshold-delta-chi2-warn",
@@ -340,18 +344,18 @@ def opts():
 
 
 def one(inFile, options, h):
-    biasMonLsb = 0.003663  # V / ADC
-    biasMin = 0.0  # ADC = 0
-    leakMin = 0.0  # ADC = 0
+    vMonLsb = 0.003663  # V / ADC
+    vMin = 0.0  # ADC = 0
+
+    iLsb = 0.0006105  # A / ADC
+    iMin = 0.0  # ADC = 0
+
+    tLsb = 0.01 # FIXME
+    tMin = -50.0 # FIXME
+
     nCh = 4 * scan_peltier.nRbxes(inFile.split("_")[0])
 
     final = inFile.split("/")[-1]
-    if final.startswith("HB"):
-        leakLsb = 0.0006105  # A / ADC
-    elif final.starswith("HE"):
-        leakLsb = 0.122  # uA / ADC
-    else:
-        sys.exit("Each argument must contain either 'HB' or 'HE'.  Found '%s'" % inFile)
 
     outFile = inFile.replace(".pickle", ".pdf")
     target = inFile.replace(".pickle", "")
@@ -360,18 +364,18 @@ def one(inFile, options, h):
 
     settings = sorted(d_voltages.keys())
     g_voltages, min_bv_voltages, factor_voltages = graphs(inFile, nCh, options, settings,
-                                                          d_voltages, biasMin*1.001, biasMonLsb*options.lsbFactorVoltage)
+                                                          d_voltages, vMin*1.001, vMonLsb*options.lsbFactorVoltage)
 
     g_currents, min_bv_currents, factor_currents = graphs(inFile, nCh, options, settings,
-                                                          d_currents, leakMin*1.001, leakLsb*options.lsbFactorCurrent)
+                                                          d_currents, iMin*1.001, iLsb*options.lsbFactorCurrent)
 
-    g_temperatures, min_bv_temperatures, factor_temperatures = graphs(inFile, nCh, options, settings,  # FIXME: min/unc
-                                                                      d_temperatures, leakMin*1.001, leakLsb*options.lsbFactorTemperature)
+    g_temperatures, min_bv_temperatures, factor_temperatures = graphs(inFile, nCh, options, settings,
+                                                                      d_temperatures, tMin*1.001, tLsb*options.lsbFactorTemperature)
 
 
     p_voltages = fits(g_voltages, min_bv_voltages, options, target,  1.0)
     p_currents = fits(g_currents, min_bv_currents, options, target, 0.15)
-    p_temperatures = fits(g_temperatures, min_bv_temperatures, options, target, 0.0)
+    p_temperatures = fits(g_temperatures, min_bv_temperatures, options, target, -7.0)
 
     if not p_voltages:
         return
@@ -389,6 +393,7 @@ def one(inFile, options, h):
                           h["V_delta_chi2"], h["V_delta_chi2_cut_vs_ch"],
                           h["V_offsets"], h["V_offsets_unc"],
                           h["V_slopes"], h["V_slopes_unc_rel"],
+                          h["V_curvatures"], h["V_curvatures_unc"],
                           warn=False)
     # histogram_fit_results_vs_channel(p_voltages, nCh, can, outFile, target=target, title="PV meas", unit="V")
 
@@ -401,18 +406,23 @@ def one(inFile, options, h):
                           h["I_pvalues"], h["I_pvalues2"],
                           h["I_delta_chi2"], h["I_delta_chi2_cut_vs_ch"],
                           h["I_offsets"], h["I_offsets_unc"],
-                          h["I_slopes"], h["I_slopes_unc_rel"])
+                          h["I_slopes"], h["I_slopes_unc_rel"],
+                          h["I_curvatures"], h["I_curvatures_unc"],
+                          offset2=True, slope2=True)
     # histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="Imeas", unit="A")
 
     draw_per_channel(g_temperatures, "T(C)", can, outFile, options,
-                     xMin=-0.5, yMin=-10.0, yMax=7.5*5.0)
+                     xMin=-0.5, yMin=-10.0, yMax=7.5*5.0, fColor2=(r.kGreen if options.is_voltage else None))
     histogram_fit_results(p_temperatures, min_bv_temperatures, factor_temperatures,
                           options, target,
                           h["T_npoints"], h["T_mins"], h["T_factors"],
                           h["T_pvalues"], h["T_pvalues2"],
                           h["T_delta_chi2"], h["T_delta_chi2_cut_vs_ch"],
                           h["T_offsets"], h["T_offsets_unc"],
-                          h["T_slopes"], h["T_slopes_unc_rel"])
+                          h["T_slopes"], h["T_slopes_unc_rel"],
+                          h["T_curvatures"], h["T_curvatures_unc"],
+                          offset2=True, slope2=True)
+
     # histogram_fit_results_vs_channel(p_temperatures, nCh, can, outFile, target=target, title="T", unit="C")
 
     can.Print(outFile + "]")
@@ -451,17 +461,17 @@ def multi_panel(options, hs, can, outFile, keys):
             h.SetMinimum(0.5)
             r.gPad.SetLogy("pvalue" not in h.GetName())
 
-        if h.GetName().startswith("I_"):
-            xs = []
-            if "_rel" in h.GetName():
-                xs = [options.threshold_slope_rel_unc_warn]
-            elif "slope" in h.GetName():
-                xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
-            elif "delta_chi2" in h.GetName() and "vs" not in h.GetName():
-                xs = [options.threshold_delta_chi2_warn]
+        # if h.GetName().startswith("I_"):
+        #     xs = []
+        #     if "_rel" in h.GetName():
+        #         xs = [options.threshold_slope_rel_unc_warn]
+        #     elif "slope" in h.GetName():
+        #         xs = [options.threshold_slope_lo_warn, options.threshold_slope_hi_warn]
+        #     elif "delta_chi2" in h.GetName() and "vs" not in h.GetName():
+        #         xs = [options.threshold_delta_chi2_warn]
 
-            for x in xs:
-                keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
+        #     for x in xs:
+        #         keep.append(line.DrawLine(x, h.GetMinimum(), x, h.GetMaximum()))
 
         if (iH % nPads) == (nPads - 1) or iH == len(keys) - 1:
             can.Print(outFile)
@@ -478,17 +488,9 @@ def draw_summary(options, hs):
     can.SetTicky()
     can.Print(outFile + "[")
 
-    multi_panel(options, hs, can, outFile,
-                ["V_pvalues", "V_pvalues2", "V_npoints", "V_delta_chi2",
-                 "V_offsets", "V_slopes", "V_offsets_unc", "V_slopes_unc_rel",
-                 "V_mins", "V_factors", "V_delta_chi2_cut_vs_ch",
-                ])
-
-    multi_panel(options, hs, can, outFile,
-                ["I_pvalues", "I_pvalues2", "I_npoints", "I_delta_chi2",
-                 "I_offsets", "I_slopes", "I_offsets_unc", "I_slopes_unc_rel",
-                 "I_mins", "I_factors", "I_delta_chi2_cut_vs_ch",
-                ])
+    multi_panel(options, hs, can, outFile, ["V_pvalues", "V_offsets", "V_slopes"])
+    multi_panel(options, hs, can, outFile, ["I_pvalues2", "I_offsets", "I_slopes", "I_curvatures"])
+    multi_panel(options, hs, can, outFile, ["T_pvalues2", "T_offsets", "T_slopes", "T_curvatures"])
 
     can.Print(outFile + "]")
     print("Wrote %s" % outFile)
@@ -497,7 +499,7 @@ def draw_summary(options, hs):
 def histos(options):
     nCh = 4  # FIXME
     out = {}
-    nPoints = 100
+    nPoints = 200
     nChi2 = 201
     delta_chi2 = "#chi^{2}_{0} - #chi^{2}_{c*}"
     for key, (t, b) in {"V_npoints": ("V;number of fit points;channels / bin", (nPoints, -0.5, nPoints - 0.5)),
@@ -524,18 +526,24 @@ def histos(options):
                         "V_delta_chi2_cut_vs_ch": ("V (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "I_delta_chi2_cut_vs_ch": ("I (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
                         "T_delta_chi2_cut_vs_ch": ("T (%g < %s);RM;channels / bin" % (options.threshold_delta_chi2_warn, delta_chi2), (nCh, 0.5, 0.5 + nCh)),
-                        "V_offsets": ("V;fit offset  (V);channels / bin", (200, -0.2, 0.2)),
-                        "I_offsets": ("I;fit offset (uA);channels / bin", (200, -50.0, 50.0)),
-                        "T_offsets": ("T;fit offset (C);channels / bin", (200, -50.0, 50.0)),
+                        "V_offsets": ("V;fit offset (V);channels / bin", (200, -0.2, 0.2)),
+                        "I_offsets": ("I;fit offset (A);channels / bin", (200, -0.5, 0.5)),
+                        "T_offsets": ("T;fit offset (C);channels / bin", (200, 0.0, 50.0)),
                         "V_offsets_unc": ("V;uncertainty on fit offset (V);channels / bin", (200, 0.0, 0.007)),
-                        "I_offsets_unc": ("I;uncertainty on fit offset (uA);channels / bin", (200, 0.0, 5.0)),
+                        "I_offsets_unc": ("I;uncertainty on fit offset (A);channels / bin", (200, 0.0, 5.0)),
                         "T_offsets_unc": ("T;uncertainty on fit offset (C);channels / bin", (200, 0.0, 5.0)),
-                        "V_slopes": ("V;fit slope  (V/V);channels / bin", (200, 0.90, 1.01)),
-                        "I_slopes": ("I;fit slope (uA/V);channels / bin", (200, 0.00, 0.50)),
-                        "T_slopes": ("T;fit slope (C/V);channels / bin", (200, 0.00, 0.50)),
+                        "V_slopes": ("V;fit slope (V/V);channels / bin", (200, 0.95, 1.05)),
+                        "I_slopes": ("I;fit slope (A/V);channels / bin", (200, 0.00, 0.50)),
+                        "T_slopes": ("T;fit slope (C/V);channels / bin", (200, -10.0, 0.0)),
                         "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
                         "I_slopes_unc_rel": ("I;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
                         "T_slopes_unc_rel": ("T;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
+                        "V_curvatures": ("V;fit curvatures (V/V^2);channels / bin", (200, -0.2, 0.2)),
+                        "I_curvatures": ("I;fit curvatures (A/V^2);channels / bin", (200, -0.03, 0.03)),
+                        "T_curvatures": ("T;fit curvatures (C/V^2);channels / bin", (200, 0.0, 1.0)),
+                        "V_curvatures_unc": ("V;uncertainty on fit offset (V/V^2);channels / bin", (200, 0.0, 0.007)),
+                        "I_curvatures_unc": ("I;uncertainty on fit offset (A/V^2);channels / bin", (200, 0.0, 5.0)),
+                        "T_curvatures_unc": ("T;uncertainty on fit offset (C/V^2);channels / bin", (200, 0.0, 5.0)),
     }.items():
         if len(b) == 3:
             out[key] = r.TH1D(key, t, *b)
