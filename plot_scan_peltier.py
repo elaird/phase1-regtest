@@ -538,12 +538,12 @@ def histos(options):
                         "V_slopes_unc_rel": ("V;relative uncertainty on fit slope;channels / bin", (200, 0.0, 2.e-4)),
                         "I_slopes_unc_rel": ("I;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
                         "T_slopes_unc_rel": ("T;relative uncertainty on fit slope;channels / bin", (200, 0.0, 0.4)),
-                        "V_curvatures": ("V;fit curvatures (V/V^2);channels / bin", (200, -0.2, 0.2)),
-                        "I_curvatures": ("I;fit curvatures (A/V^2);channels / bin", (200, -0.03, 0.03)),
-                        "T_curvatures": ("T;fit curvatures (C/V^2);channels / bin", (200, 0.0, 1.0)),
-                        "V_curvatures_unc": ("V;uncertainty on fit offset (V/V^2);channels / bin", (200, 0.0, 0.007)),
-                        "I_curvatures_unc": ("I;uncertainty on fit offset (A/V^2);channels / bin", (200, 0.0, 5.0)),
-                        "T_curvatures_unc": ("T;uncertainty on fit offset (C/V^2);channels / bin", (200, 0.0, 5.0)),
+                        "V_curvatures": ("V;fit curvatures (V/V^{2});channels / bin", (200, -0.2, 0.2)),
+                        "I_curvatures": ("I;fit curvatures (A/V^{2});channels / bin", (200, -0.03, 0.03)),
+                        "T_curvatures": ("T;fit curvatures (C/V^{2});channels / bin", (200, 0.0, 1.0)),
+                        "V_curvatures_unc": ("V;uncertainty on fit offset (V/V^{2});channels / bin", (200, 0.0, 0.007)),
+                        "I_curvatures_unc": ("I;uncertainty on fit offset (A/V^{2});channels / bin", (200, 0.0, 5.0)),
+                        "T_curvatures_unc": ("T;uncertainty on fit offset (C/V^{2});channels / bin", (200, 0.0, 5.0)),
     }.items():
         if len(b) == 3:
             out[key] = r.TH1D(key, t, *b)
