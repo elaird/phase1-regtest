@@ -117,11 +117,17 @@ class scanner_bv(driver.driver):
         else:
             voltage = self.options.bvStep
 
+        if hasattr(self.options, "reverse") and self.options.reverse:
+            reverse = "_reverse"
+        else:
+            reverse = ""
+
         filename = "_".join([self.target,
                              datetime.datetime.today().strftime("%Y_%m_%d_%Hh%M"),
                              "%ds" % self.options.nSeconds,
                              ("%4.2fV" % voltage).replace(".", "p"),
                              ])
+        filename += reverse
         filename += ".pickle"
 
         with open(filename, "w") as f:
