@@ -183,7 +183,7 @@ def draw_per_channel(lst, yTitle, can, outFile, options, xMin=0.0, yMin=0.0, yMa
         r.gPad.SetTickx()
         r.gPad.SetTicky()
         null.Draw()
-        keep.append(text.DrawText(0.28, 0.75, "RM%d" % mb))
+        keep.append(text.DrawText(0.28, 0.75, "RM%d" % (mb if options.rms == "[1-4]" else int(options.rms))))
 
         g = lst[iCh]
         if fColor2 is not None:
@@ -332,6 +332,15 @@ def opts():
                       dest="print_fit_results",
                       action="store_true",
                       help="print fit results")
+    parser.add_option("--rms",
+                      dest="rms",
+                      default="[1-4]",
+                      help="RMs [default %default]")
+    parser.add_option("--no-temperature",
+                      dest="no_temperature",
+                      default=False,
+                      action="store_true",
+                      help="don't analyze temperature")
 
     options, args = parser.parse_args()
     options.is_voltage = options.bvMax < 90  # assume larger values are vs. time rather than voltage
@@ -353,7 +362,7 @@ def one(inFile, options, h):
     tLsb = 0.01 # FIXME
     tMin = -50.0 # FIXME
 
-    nCh = 4 * scan_peltier.nRbxes(inFile.split("_")[0])
+    nCh = (4 if options.rms == "[1-4]" else 1) * scan_peltier.nRbxes(inFile.split("_")[0])
 
     final = inFile.split("/")[-1]
 
@@ -369,13 +378,14 @@ def one(inFile, options, h):
     g_currents, min_bv_currents, factor_currents = graphs(inFile, nCh, options, settings,
                                                           d_currents, iMin*1.001, iLsb*options.lsbFactorCurrent)
 
-    g_temperatures, min_bv_temperatures, factor_temperatures = graphs(inFile, nCh, options, settings,
-                                                                      d_temperatures, tMin*1.001, tLsb*options.lsbFactorTemperature)
-
+    if not options.no_temperature:
+        g_temperatures, min_bv_temperatures, factor_temperatures = graphs(inFile, nCh, options, settings,
+                                                                          d_temperatures, tMin*1.001, tLsb*options.lsbFactorTemperature)
 
     p_voltages = fits(g_voltages, min_bv_voltages, options, target,  1.0)
     p_currents = fits(g_currents, min_bv_currents, options, target, 0.15)
-    p_temperatures = fits(g_temperatures, min_bv_temperatures, options, target, -7.0)
+    if not options.no_temperature:
+        p_temperatures = fits(g_temperatures, min_bv_temperatures, options, target, -7.0)
 
     if not p_voltages:
         return
@@ -411,17 +421,18 @@ def one(inFile, options, h):
                           offset2=True, slope2=True)
     # histogram_fit_results_vs_channel(p_currents, nCh, can, outFile, target=target, title="Imeas", unit="A")
 
-    draw_per_channel(g_temperatures, "T(C)", can, outFile, options,
-                     xMin=-0.5, yMin=-10.0, yMax=7.5*5.0, fColor2=(r.kGreen if options.is_voltage else None))
-    histogram_fit_results(p_temperatures, min_bv_temperatures, factor_temperatures,
-                          options, target,
-                          h["T_npoints"], h["T_mins"], h["T_factors"],
-                          h["T_pvalues"], h["T_pvalues2"],
-                          h["T_delta_chi2"], h["T_delta_chi2_cut_vs_ch"],
-                          h["T_offsets"], h["T_offsets_unc"],
-                          h["T_slopes"], h["T_slopes_unc_rel"],
-                          h["T_curvatures"], h["T_curvatures_unc"],
-                          offset2=True, slope2=True)
+    if not options.no_temperature:
+        draw_per_channel(g_temperatures, "T(C)", can, outFile, options,
+                         xMin=-0.5, yMin=-10.0, yMax=7.5*5.0, fColor2=(r.kGreen if options.is_voltage else None))
+        histogram_fit_results(p_temperatures, min_bv_temperatures, factor_temperatures,
+                              options, target,
+                              h["T_npoints"], h["T_mins"], h["T_factors"],
+                              h["T_pvalues"], h["T_pvalues2"],
+                              h["T_delta_chi2"], h["T_delta_chi2_cut_vs_ch"],
+                              h["T_offsets"], h["T_offsets_unc"],
+                              h["T_slopes"], h["T_slopes_unc_rel"],
+                              h["T_curvatures"], h["T_curvatures_unc"],
+                              offset2=True, slope2=True)
 
     # histogram_fit_results_vs_channel(p_temperatures, nCh, can, outFile, target=target, title="T", unit="C")
 
