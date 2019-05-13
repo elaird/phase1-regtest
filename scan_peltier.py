@@ -26,11 +26,20 @@ def opts():
                       default=0.05,
                       type="float",
                       help="step size (V) [default %default]")
+    parser.add_option("--no-rtd",
+                      dest="no_rtd",
+                      default=False,
+                      action="store_true",
+                      help="don't read rtd")
     parser.add_option("--reverse",
                       dest="reverse",
                       default=False,
                       action="store_true",
                       help="scan from max down to min")
+    parser.add_option("--rms",
+                      dest="rms",
+                      default="[1-4]",
+                      help="RMs [default %default]")
     parser.add_option("--default-server",
                       dest="defaultServer",
                       default=False,
@@ -81,8 +90,8 @@ class scanner_peltier(scan_bv.scanner_bv):
 
 
     def scan(self):
-        rms = "[1-4]"
-        nSettings = 4 * nRbxes(self.rbx)
+        rms = self.options.rms
+        nSettings = nRbxes(self.rbx) * (4 if rms == "[1-4]" else 1)
 
         d = {}
 
@@ -92,12 +101,14 @@ class scanner_peltier(scan_bv.scanner_bv):
             if self.options.time_scan:
                 v = iSetting * self.options.nSeconds
 
-            for cmd in ["put %s-%s-SetPeltierVoltage_f %d*%f" % (self.rbx, rms, nSettings, v),
-                        "get %s-%s-rtdtemperature_f_rr" % (self.rbx, rms),
-                        "get %s-%s-PeltierCurrent_f_rr" % (self.rbx, rms),
-                        "get %s-%s-PeltierVoltage_f_rr" % (self.rbx, rms),
-                        ]:
-                if "rtd" in cmd:
+            cmds = ["put %s-%s-SetPeltierVoltage_f %d*%f" % (self.rbx, rms, nSettings, v)]
+            if not self.options.no_rtd:
+                cmds.append("get %s-%s-rtdtemperature_f_rr" % (self.rbx, rms))
+            cmds += ["get %s-%s-PeltierCurrent_f_rr" % (self.rbx, rms),
+                     "get %s-%s-PeltierVoltage_f_rr" % (self.rbx, rms),
+                     ]
+            for iCmd, cmd in enumerate(cmds):
+                if iCmd == 1:
                     time.sleep(self.options.nSeconds)
                     if iSetting == 0 and not self.options.time_scan:
                         time.sleep(10 * self.options.nSeconds)
