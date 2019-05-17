@@ -250,15 +250,15 @@ class commissioner(driver.driver):
                 fecs = "hffec4"
                 sfp = 2
         elif self.hb:
-            if self.end == "M":
+            if self.end in "MP":
                 offset = 1
                 if 1 <= self.sector <= 6:
-                    fecs = "hbfec5"
+                    fecs = "hbfec%d" % (5 if self.end == "M" else 8)
                 elif 7 <= self.sector <= 12:
-                    fecs = "hbfec6"
+                    fecs = "hbfec%d" % (6 if self.end == "M" else 9)
                     offset += 12
                 elif 13 <= self.sector <= 18:
-                    fecs = "hbfec7"
+                    fecs = "hbfec%d" % (7 if self.end == "M" else 10)
                     offset += 24
                 sfp = 2 * self.sector - offset
             else:  # 904
@@ -317,7 +317,7 @@ class commissioner(driver.driver):
                         ("sfp%d_status.RxLOS_rr" % (sfp + i), 0, None),
                         ("sfp%d_gbt_rx_ready_rr" % (sfp + i), 1, None),
                        ], device=fecs)
-            self.check([("fec-sfp_rx_power_f", 400.0, 200.0),
+            self.check([("fec-sfp_rx_power_f", 420.0, 220.0),
                         ("fec-sfp_tx_power_f", 550.0, 150.0),
                        ], device="%s%s" % (self.rbx, letter))
 
