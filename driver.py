@@ -49,6 +49,9 @@ class driver:
         self.he = self.rbx.startswith("HE")
         self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
 
+        if hasattr(self, "host") and self.host and hasattr(self, "port") and self.port:
+            return
+
         if len(self.rbx) <= 2:
             sys.exit("The RBX must contain at least three characters.")
         else:
@@ -72,9 +75,8 @@ class driver:
             host = "localhost"
             port = 64000
 
-        # driver.connect assumes these are included as options
-        self.options.host = host
-        self.options.port = port
+        self.host = host
+        self.port = port
 
 
     def errors(self, store=True, letter="", fec=True, ccm=True, sleep=True, old=False):
@@ -187,7 +189,7 @@ class driver:
         self.logfile.write(h)
 
         # os.system("killall ngccm >& /dev/null")
-        self.server = pexpect.spawn("ngFEC.exe -z -c -t -p %d -H %s" % (self.options.port, self.options.host))
+        self.server = pexpect.spawn("ngFEC.exe -z -c -t -p %d -H %s" % (self.port, self.host))
         self.server.logfile = self.logfile
         self.server.sendline("")
         self.server.expect(".*")
