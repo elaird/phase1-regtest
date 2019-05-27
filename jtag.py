@@ -219,8 +219,7 @@ class programmer(driver.driver):
         self.target, self.rbx = check_target(target)
         self.target0 = self.target.split("-")[0]
 
-        if not (self.options.host and self.options.port):
-            self.assign_sector_host_port()
+        self.assign_sector_host_port()
 
         self.connect(quiet=self.options.deviceInfoOnly)
 
