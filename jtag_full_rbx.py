@@ -5,10 +5,10 @@ import collections, datetime, pickle, os
 import jtag, printer
 
 
-def targets(rbx, options):
+def targets(rbx, options, nRms=4):
     lst = []
-    for iRm in range(1, 5):
-        for iCard in range(1, 5):
+    for iRm in range(1, 1 + nRms):
+        for iCard in range(1, 1 + nRms):
             lst.append((iRm, iCard))
     if options.reverse:
         lst.reverse()
