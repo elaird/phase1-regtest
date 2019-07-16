@@ -290,7 +290,7 @@ class commissioner(driver.driver):
                     ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("cdce_pll_locked", 1, None),
-                    ("ig_ipBus_cnt", 0, 0),
+                    ("ig_ipBus_cnt", 2, 2),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
                     # qie_reset_cnt_rr
@@ -462,7 +462,7 @@ class commissioner(driver.driver):
                 nCh = 48 if self.he else 64
                 self.check([("%d-BVin_f_rr" % iRm, 100.0, 4.0),
                             ("%d-biasmon[1-%d]_f_rr" % (iRm, nCh), 67.0, 3.0),
-                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 12.0, 8.0), # https://indico.cern.ch/event/800901/
+                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 12.0, 9.0), # https://indico.cern.ch/event/800901/
                            ])
 
         if self.options.set_bv:
