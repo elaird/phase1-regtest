@@ -102,13 +102,13 @@ def opts():
     return options, args[0]
 
 
-def uhtr_tool_link_status(crate, slot1, slot2, he):
+def uhtr_tool_link_status(crate, slot1, slot2, usc, he):
     lines = {}
     for slot in [slot1, slot2]:
         for ppod in range(2):
-            if he and slot == slot1 and not ppod:
+            if usc and he and slot == slot1 and not ppod:
                 continue
-            if (not he) and slot == slot2 and ppod:
+            if usc and (not he) and slot == slot2 and ppod:
                 continue
 
             cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep '^PPOD%d' -A 11" % (crate, slot, ppod)
@@ -119,7 +119,6 @@ def uhtr_tool_link_status(crate, slot1, slot2, he):
 class commissioner(driver.driver):
     def __init__(self, options, target):
         self.rbx = target
-
         self.options = options
         if not self.options.logfile:
             self.options.logfile = self.rbx + ".log"
@@ -322,8 +321,8 @@ class commissioner(driver.driver):
                        ], device="%s%s" % (self.rbx, letter))
 
             if not old:
-                self.check([("fec_min_phase", None, None),
-                            ("fec_max_phase", None, None),
+                self.check([("fec_min_phase", None, None), # 0x0f0, 0x30)
+                            ("fec_max_phase", None, None), # 0x110, 0x30)
                         ], device="%s%s" % (self.rbx, letter))
 
             self.errors(ccm=False, sleep=False, letter=letter, old=old)
@@ -592,7 +591,7 @@ class commissioner(driver.driver):
             crate = 38
             slot1 = 7
             slot2 = 9
-        elif iEnd != -1:  # USC
+        elif self.usc:  # USC
             if self.hf:
                 sys.exit("'--uhtr' is not yet supported for HF.")
             else:  # HBHE
@@ -605,20 +604,21 @@ class commissioner(driver.driver):
               except IndexError:
                   printer.error("Could not find uHTR reading out %s" % self.rbx)
                   return
-        elif self.he:  # 904
+        else:  # 904
             ss = self.sector - 1
             crate = 61 + int(ss / 9)
             if 9 <= ss:
                 ss -= 9
-            slot1 = 1 + 4 * int(ss / 3)
+            slot1 = 1 + int(4 * ss / 3)
             slot2 = slot1 + 1
 
         out = []
-        link_status = uhtr_tool_link_status(crate, slot1, slot2, he=self.he)
+        link_status = uhtr_tool_link_status(crate, slot1, slot2, usc=self.usc, he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
+            first = slot == slot1
             link, power, bad8b10b, bc0, h1, write_delay, read_delay, fifo_occ, bprv, h2, bad_full, invalid, h3 = lines.split("\n")
-            iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ)
-            # iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, write_delay)
+            iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, fifo_occ, first)
+            # iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, write_delay, first)
             out.append((self.sector, crate, slot, ppod, items[iStart:iEnd]))
             if not check:
                 continue
@@ -627,22 +627,37 @@ class commissioner(driver.driver):
             link_headers = link[19:]
             # https://github.com/elaird/hcalraw/blob/master/data/ref_2019.txt
             if self.hb or self.he:
-                s3 = slot % 3
-                if s3 == 1:
+                if self.usc:
+                    s3 = slot % 3
+                    if s3 == 1:
+                        if ppod:
+                            link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20(1-8) rx21(2-8) rx22(3-8) rx23(4-8)"
+                        else:
+                            link_headers = " rx00(1-1) rx01(2-1) rx02(3-1) rx03(4-1) rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
+                    elif s3 == 2:
+                        if ppod:
+                            link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
+                        else:
+                            link_headers = " rx00      rx01      rx02(1-2) rx03(1-3) rx04(2-2) rx05(2-3) rx06(3-2) rx07(3-3) rx08(4-2) rx09(4-3) rx10(5-1) rx11     "
+                    elif not s3:
+                        if ppod:
+                            link_headers = " rx12      rx13(3-1) rx14(3-3) rx15(3-5) rx16(3-7) rx17(3-8) rx18(4-1) rx19(4-2) rx20(4-3) rx21(4-6) rx22(4-8) rx23(5-1)"
+                        else:
+                            link_headers = " rx00      rx01(1-1) rx02(1-3) rx03(1-5) rx04(1-7) rx05(1-8) rx06(2-1) rx07(2-2) rx08(2-3) rx09(2-6) rx10(2-8) rx11(5-2)"
+                else:
+                    rm0 = [2, 1, 4, 3][slot % 4]
+                    rm1 = rm0 + 1
+                    if 4 < rm1:
+                        rm1 -= 4
+                    rm2 = rm0 + 2
+                    if 4 < rm2:
+                        rm2 -= 4
+
                     if ppod:
-                        link_headers = " rx12(1-6) rx13(2-6) rx14(3-6) rx15(4-6) rx16(1-7) rx17(2-7) rx18(3-7) rx19(4-7) rx20(1-8) rx21(2-8) rx22(3-8) rx23(4-8)"
+                        link_headers = " rx12(%d-5) rx13(%d-6) rx14(%d-7) rx15(%d-8) rx16(%d-1) rx17(%d-2) rx18(%d-3) rx19(%d-4) rx20(%d-5) rx21(%d-6) rx22(%d-7) rx23(%d-8)" % tuple([rm1] * 4 + [rm2] * 8)
                     else:
-                        link_headers = " rx00(1-1) rx01(2-1) rx02(3-1) rx03(4-1) rx04(1-4) rx05(2-4) rx06(3-4) rx07(4-4) rx08(1-5) rx09(2-5) rx10(3-5) rx11(4-5)"
-                elif s3 == 2:
-                    if ppod:
-                        link_headers = " rx12(1-2) rx13(1-4) rx14(1-6) rx15(2-4) rx16(2-5) rx17(2-7) rx18(3-2) rx19(3-4) rx20(3-6) rx21(4-4) rx22(4-5) rx23(4-7)"
-                    else:
-                        link_headers = " rx00      rx01      rx02(1-2) rx03(1-3) rx04(2-2) rx05(2-3) rx06(3-2) rx07(3-3) rx08(4-2) rx09(4-3) rx10(5-1) rx11     "
-                elif not s3:
-                    if ppod:
-                        link_headers = " rx12      rx13(3-1) rx14(3-3) rx15(3-5) rx16(3-7) rx17(3-8) rx18(4-1) rx19(4-2) rx20(4-3) rx21(4-6) rx22(4-8) rx23(5-1)"
-                    else:
-                        link_headers = " rx00      rx01(1-1) rx02(1-3) rx03(1-5) rx04(1-7) rx05(1-8) rx06(2-1) rx07(2-2) rx08(2-3) rx09(2-6) rx10(2-8) rx11(5-2)"
+                        link_headers = " rx00(%d-1) rx01(%d-2) rx02(%d-3) rx03(%d-4) rx04(%d-5) rx05(%d-6) rx06(%d-7) rx07(%d-8) rx08(%d-1) rx09(%d-2) rx10(%d-3) rx11(%d-4)" % tuple([rm0] * 8 + [rm1] * 4)
+
             elif self.hf:
                 if ppod:
                     link_headers = " rx12      rx13      rx14      rx15      rx16      rx17      rx18      rx19      rx20      rx21      rx22      rx23     "
@@ -650,24 +665,24 @@ class commissioner(driver.driver):
                     link_headers = " rx00      rx01      rx02      rx03      rx04      rx05      rx06      rx07      rx08      rx09      rx10      rx11     "
 
             print(link[:19] + link_headers)
-            self.uhtr_compare(slot, ppod, power, 300.0, threshold=200.0)
-            self.uhtr_compare(slot, ppod, bad8b10b, 0, threshold=0)
-            self.uhtr_compare(slot, ppod, bc0, 11.2, threshold=0.1)
+            self.uhtr_compare(slot, ppod, first, power, 300.0, threshold=150.0)
+            self.uhtr_compare(slot, ppod, first, bad8b10b, 0, threshold=0)
+            self.uhtr_compare(slot, ppod, first, bc0, 11.2, threshold=0.1)
             printer.gray(h1)
-            self.uhtr_compare(slot, ppod, write_delay, 300, threshold=100000, dec=True)
-            self.uhtr_compare(slot, ppod, read_delay, 300, threshold=100000, dec=True)
-            self.uhtr_compare(slot, ppod, fifo_occ, 12, threshold=9, dec=True)
-            self.uhtr_compare(slot, ppod, bprv, 0x1111, threshold=0)
+            self.uhtr_compare(slot, ppod, first, write_delay, 300, threshold=100000, dec=True)
+            self.uhtr_compare(slot, ppod, first, read_delay, 300, threshold=100000, dec=True)
+            self.uhtr_compare(slot, ppod, first, fifo_occ, 12, threshold=9, dec=True)
+            self.uhtr_compare(slot, ppod, first, bprv, 0x1111, threshold=0)
             printer.gray(h2)
-            self.uhtr_compare(slot, ppod, bad_full, 0, threshold=1, doubled=True)
-            self.uhtr_compare(slot, ppod, invalid, 0, threshold=1)
+            self.uhtr_compare(slot, ppod, first, bad_full, 0, threshold=1, doubled=True)
+            self.uhtr_compare(slot, ppod, first, invalid, 0, threshold=1)
             printer.gray(h3)
 
         return out
 
 
-    def uhtr_compare(self, slot, ppod, lst, expected, threshold=None, doubled=False, dec=False):
-        iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst)
+    def uhtr_compare(self, slot, ppod, first, lst, expected, threshold=None, doubled=False, dec=False):
+        iStart, iEnd, items = self.uhtr_range_and_items(slot, ppod, lst, first)
         n = int((len(lst) - 19) / 12)
         if doubled:
             iStart *= 2
@@ -699,7 +714,7 @@ class commissioner(driver.driver):
         print(msg)
 
 
-    def uhtr_range_and_items(self, slot, ppod, lst):
+    def uhtr_range_and_items(self, slot, ppod, lst, first):
         items = lst[19:].split()
 
         if self.rbx == "lasermon":
@@ -711,6 +726,28 @@ class commissioner(driver.driver):
         if self.hf:
             return 0, 12, items
 
+        if not self.usc:
+            if (slot % 4) == 2:
+                if ppod:
+                    if not first:
+                        return 0, 0, items
+                else:
+                    if first:
+                        return 8, 12, items
+                    else:
+                        return 0, 8, items
+            if (slot % 4) == 3:
+                if first:
+                    if ppod:
+                        return 5, 12, items
+                    else:
+                        return 0, 0, items
+                elif ppod:
+                    return 0, 4, items
+
+            return 0, 12, items
+
+        # USC
         if (slot % 3) == 0:
             iStart = 1
             iEnd = 12  # include ngHE CU fibers
