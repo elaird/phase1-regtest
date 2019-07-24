@@ -49,27 +49,27 @@ class driver:
         self.he = self.rbx.startswith("HE")
         self.hf = self.rbx.startswith("HF") or self.rbx == "lasermon" or self.rbx.startswith("ZDC")
 
-        if hasattr(self, "host") and self.host and hasattr(self, "port") and self.port:
-            return
-
         if len(self.rbx) <= 2:
             sys.exit("The RBX must contain at least three characters.")
         else:
             self.end = self.rbx[2]
 
-        usc = self.end in "MPsC"
-        self.sector = sector(self.rbx, not usc)
+        self.usc = self.end in "MPsC"
+        self.sector = sector(self.rbx, not self.usc)
+
+        if hasattr(self, "host") and self.host and hasattr(self, "port") and self.port:
+            return
 
         if self.hb or self.he:
-            if usc:
+            if self.usc:
                 host = "hcalngccm03" if self.hb else "hcalngccm02"
                 port = 64400 if self.hb else 64000
             else:  # assume 904
                 host = "hcal904daq04"
                 port = 64400
         elif self.hf:
-            host = "hcalngccm01" if usc else "hcal904daq02"
-            port = 63000 if usc else 63700
+            host = "hcalngccm01" if self.usc else "hcal904daq02"
+            port = 63000 if self.usc else 63700
 
         if default:
             host = "localhost"
