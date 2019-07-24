@@ -743,7 +743,7 @@ class commissioner(driver.driver):
             if (slot % 4) == 3:
                 if first:
                     if ppod:
-                        return 5, 12, items
+                        return 4, 12, items
                     else:
                         return 0, 0, items
                 elif ppod:
