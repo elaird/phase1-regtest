@@ -102,13 +102,13 @@ def opts():
     return options, args[0]
 
 
-def uhtr_tool_link_status(crate, slot1, slot2, usc, he):
+def uhtr_tool_link_status(crate, slot1, slot2, three, he):
     lines = {}
     for slot in [slot1, slot2]:
         for ppod in range(2):
-            if usc and he and slot == slot1 and not ppod:
+            if three and he and slot == slot1 and not ppod:
                 continue
-            if usc and (not he) and slot == slot2 and ppod:
+            if three and (not he) and slot == slot2 and ppod:
                 continue
 
             cmd = "uHTRtool.exe -c %d:%d -s linkStatus.uhtr | grep '^PPOD%d' -A 11" % (crate, slot, ppod)
@@ -604,7 +604,11 @@ class commissioner(driver.driver):
               except IndexError:
                   printer.error("Could not find uHTR reading out %s" % self.rbx)
                   return
-        else:  # 904
+        elif not self.sector:  # 904
+            crate = 63
+            slot1 = 4 if self.hb else 5
+            slot2 = slot1 + 1
+        else:
             ss = self.sector - 1
             crate = 61 + int(ss / 9)
             if 9 <= ss:
@@ -613,7 +617,7 @@ class commissioner(driver.driver):
             slot2 = slot1 + 1
 
         out = []
-        link_status = uhtr_tool_link_status(crate, slot1, slot2, usc=self.usc, he=self.he)
+        link_status = uhtr_tool_link_status(crate, slot1, slot2, three=(self.usc or not self.sector), he=self.he)
         for (crate, slot, ppod), lines in sorted(link_status.iteritems()):
             first = slot == slot1
             link, power, bad8b10b, bc0, h1, write_delay, read_delay, fifo_occ, bprv, h2, bad_full, invalid, h3 = lines.split("\n")
@@ -627,7 +631,7 @@ class commissioner(driver.driver):
             link_headers = link[19:]
             # https://github.com/elaird/hcalraw/blob/master/data/ref_2019.txt
             if self.hb or self.he:
-                if self.usc:
+                if self.usc or not self.sector:
                     s3 = slot % 3
                     if s3 == 1:
                         if ppod:
@@ -726,7 +730,7 @@ class commissioner(driver.driver):
         if self.hf:
             return 0, 12, items
 
-        if not self.usc:
+        if (not self.usc) and self.sector:
             if (slot % 4) == 2:
                 if ppod:
                     if not first:
