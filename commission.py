@@ -669,7 +669,7 @@ class commissioner(driver.driver):
                     link_headers = " rx00      rx01      rx02      rx03      rx04      rx05      rx06      rx07      rx08      rx09      rx10      rx11     "
 
             print(link[:19] + link_headers)
-            self.uhtr_compare(slot, ppod, first, power, 300.0, threshold=150.0)
+            self.uhtr_compare(slot, ppod, first, power, 330.0, threshold=120.0)
             self.uhtr_compare(slot, ppod, first, bad8b10b, 0, threshold=0)
             self.uhtr_compare(slot, ppod, first, bc0, 11.2, threshold=0.1)
             printer.gray(h1)
