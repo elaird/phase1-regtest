@@ -455,13 +455,13 @@ class commissioner(driver.driver):
                      # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                     ]
             self.check(items)
-            self.check([("%d-humidityS_f_rr" % iRm, 10.0, 11.0)], timeout=15)
+            self.check([("%d-humidityS_f_rr" % iRm, 3.0, 4.0)], timeout=15)
 
             if not self.options.set_bv:
                 nCh = 48 if self.he else 64
                 self.check([("%d-BVin_f_rr" % iRm, 100.0, 4.0),
                             ("%d-biasmon[1-%d]_f_rr" % (iRm, nCh), 67.0, 3.0),
-                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 12.0, 9.0), # https://indico.cern.ch/event/800901/
+                            ("%d-LeakageCurrent[1-%d]_f_rr" % (iRm, nCh), 13.0, 11.0), # https://indico.cern.ch/event/800901/
                            ])
 
         if self.options.set_bv:
