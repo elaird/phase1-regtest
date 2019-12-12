@@ -289,6 +289,7 @@ class commissioner(driver.driver):
                     ("fec_firmware_date_rr", fw[3], None),
                     ("LHC_clk_freq_rr", 0x61d90, 10),
                     ("cdce_pll_locked", 1, None),
+                    ("cdce_pll_unlocked_cnt", 1, 1),
                     ("ig_ipBus_cnt", 2, 2),
                     # SinErr_cnt_rr
                     # DbErr_cnt_rr
@@ -321,7 +322,8 @@ class commissioner(driver.driver):
                        ], device="%s%s" % (self.rbx, letter))
 
             if not old:
-                self.check([("fec_min_phase", None, None), # 0x0f0, 0x30)
+                self.check([("fec_dv_down_cnt", 1, 1),
+                            ("fec_min_phase", None, None), # 0x0f0, 0x30)
                             ("fec_max_phase", None, None), # 0x110, 0x30)
                         ], device="%s%s" % (self.rbx, letter))
 
@@ -382,7 +384,9 @@ class commissioner(driver.driver):
                     ("smezz_MASTER_J14_ENABLE_rr", None, None)]
 
         if self.hb or self.he:
-            lst += [("mezz_PELTIER_DISABLE_CNTR", 5, 5),
+            lst += [("mezz_RX_PLL_LOCK_LOST_CNT", 1, 1),
+                    ("b2b_RX_PLL_LOCK_LOST_CNT", 1, 1),
+                    ("mezz_PELTIER_DISABLE_CNTR", 5, 5),
                     ("b2b_PELTIER_DISABLE_CNTR", 5, 5),
                     ("mezz_PWR_ENABLE_CNTR", 5, 5),
                     ("b2b_PWR_ENABLE_CNTR", 5, 5)]
