@@ -453,8 +453,8 @@ class commissioner(driver.driver):
             print("| BV and Peltier (RM %d) |" % iRm)
             print("-" * 25)
 
-            items = [("%d-PeltierVoltage_f_rr" % iRm, 3.0, 2.5),
-                     ("%d-PeltierCurrent_f_rr" % iRm, 0.9, 0.75),
+            items = [("%d-PeltierVoltage_f_rr" % iRm, 2.5, 2.5),
+                     ("%d-PeltierCurrent_f_rr" % iRm, 0.8, 0.8),
                      ("%d-rtdtemperature_f_rr" % iRm, self.options.temperature, 2.0),
                      # ("%d-temperature_f" % iRm, 18.0 if self.he else 5.0, 2.0),
                     ]
