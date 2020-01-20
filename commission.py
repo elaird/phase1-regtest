@@ -337,7 +337,7 @@ class commissioner(driver.driver):
                             ("fecccm_epcs_cdr_locked_cnt", always, None),
                             ("fecccm_rx_pll_locked_cnt", always, None),
                             ("fecccm_rx_header_locked_cnt", always, None),
-                            ("fecccm_rx_is_data", 1, None),
+                            # ("fecccm_rx_is_data", 1, None),
                             ("fecccm_rx_ready_cnt", always, None),
                             ("fecccm_rx_data_valid_cnt", always, None),
                            ], device="%s%s" % (self.rbx, letter))
@@ -384,8 +384,8 @@ class commissioner(driver.driver):
                     ("smezz_MASTER_J14_ENABLE_rr", None, None)]
 
         if self.hb or self.he:
-            lst += [("mezz_RX_PLL_LOCK_LOST_CNT", 1, 1),
-                    ("b2b_RX_PLL_LOCK_LOST_CNT", 1, 1),
+            lst += [("mezz_RX_PLL_LOCK_LOST_CNT_rr", 1, 1),
+                    ("b2b_RX_PLL_LOCK_LOST_CNT_rr", 1, 1),
                     ("mezz_PELTIER_DISABLE_CNTR", 5, 5),
                     ("b2b_PELTIER_DISABLE_CNTR", 5, 5),
                     ("mezz_PWR_ENABLE_CNTR", 5, 5),
