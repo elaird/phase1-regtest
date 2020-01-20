@@ -180,9 +180,43 @@ class commissioner(driver.driver):
             self.disconnect()
 
 
+    def fec_and_sfp(self):
+        out = None
+        if self.end not in "MP":
+            if self.hf:
+                filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hf904_7.txt/pro"
+            else:
+                filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hb904_4.txt/pro"
+
+        f = open(filename)
+        for line in f:
+            if not line:
+                continue
+
+            fields = line.split()
+            if fields[0] != "INCLUDE":
+                continue
+
+            fec = fields[-1].replace("_fec_=", "")
+            for item in fields:
+                if item.endswith(self.rbx):
+                    sfp = item.replace("_=" + self.rbx, "").replace("_rbx", "")
+                    try:
+                        sfp = int(sfp)
+                    except ValueError as e:
+                        sfp = ord(sfp) - 96
+                        sfp = 2 * sfp - 1
+                    out = (fec, sfp)
+        f.close()
+
+        if out is None:
+            sys.exit("Did not find %s in %s" % (self.rbx, filename))
+        return out
+
+
     def fec(self):
         # USC: http://cmsonline.cern.ch/cms-elog/1082901
-        # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.15
+        # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.19
 
         # hbhe_full = (3, 1, 2, 0x14032018)
         hbhe_full = (3, 1, 2, 0x20102017)
@@ -204,7 +238,7 @@ class commissioner(driver.driver):
                 else:
                     fecs = "hefec3"
                     sfp = self.sector - 12
-            if self.end == "P":
+            elif self.end == "P":
                 if self.sector in [10, 30]:
                     fw = hbhe_full
                     fecs = "hefec1"
@@ -216,38 +250,32 @@ class commissioner(driver.driver):
                     fecs = "hefec4"
                     sfp = self.sector - 6
 
-            elif self.rbx == "HE0":
-                fecs = "hbfec8"
-                sfp = 1
-            elif self.rbx == "HE1":
-                fecs = "hbfec8"
-                sfp = 3
-            elif self.rbx == "HE1R":
-                fecs = "hbfec8"
-                sfp = 4
+            else:
+                fecs, sfp = self.fec_and_sfp()
+
         elif self.hf:
             fw = (3, 1, 2, 0x16042018)
             if self.end == "M" and 1 <= self.sector <= 6:
                 fecs = "hffec1"
                 sfp = 1 + self.sector
-            if self.end == "M" and 7 <= self.sector <= 8:
+            elif self.end == "M" and 7 <= self.sector <= 8:
                 fecs = "hffec2"
                 sfp = self.sector - 5
-            if self.end == "P" and 1 <= self.sector <= 4:
+            elif self.end == "P" and 1 <= self.sector <= 4:
                 fecs = "hffec2"
                 sfp = 3 + self.sector
-            if self.end == "P" and 5 <= self.sector <= 8:
+            elif self.end == "P" and 5 <= self.sector <= 8:
                 fecs = "hffec3"
                 sfp = self.sector - 3
-            if self.rbx == "lasermon" or self.rbx == "ZDCM":
+            elif self.rbx == "lasermon" or self.rbx == "ZDCM":
                 fecs = "hffec3"
                 sfp = 6
-            if self.rbx == "ZDCP":
+            elif self.rbx == "ZDCP":
                 fecs = "hffec3"
                 sfp = 7
-            if self.rbx == "HF17":
-                fecs = "hffec4"
-                sfp = 2
+            else:
+                fecs, sfp = self.fec_and_sfp()
+
         elif self.hb:
             if self.end in "MP":
                 offset = 1
@@ -261,18 +289,7 @@ class commissioner(driver.driver):
                     offset += 24
                 sfp = 2 * self.sector - offset
             else:  # 904
-                if self.sector == 0:
-                    fecs = "hbfec8"
-                    sfp = 7
-                if 1 <= self.sector <= 6:
-                    fecs = "hbfec1"
-                    sfp = 2 * self.sector - 1
-                elif 7 <= self.sector <= 12:
-                    fecs = "hbfec2"
-                    sfp = 2 * (self.sector - 6) - 1
-                elif self.sector == 13:
-                    fecs = "hbfec8"
-                    sfp = 9
+                fecs, sfp = self.fec_and_sfp()
 
         if self.options.bat28:
             fecs = "fec1"
