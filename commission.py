@@ -182,7 +182,14 @@ class commissioner(driver.driver):
 
     def fec_and_sfp(self):
         out = None
-        if self.end not in "MP":
+        if self.end in "MP":
+            if self.hf:
+                filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hfpt5_0.txt/pro"
+            elif self.he:
+                filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hept5_0.txt/pro"
+            elif self.hb:
+                filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hbpt5_4.txt/pro"
+        else:
             if self.hf:
                 filename = "/nfshome0/hcalcfg/cvs/RevHistory/CCMServer/top_hf904_7.txt/pro"
             else:
@@ -190,10 +197,9 @@ class commissioner(driver.driver):
 
         f = open(filename)
         for line in f:
-            if not line:
-                continue
-
             fields = line.split()
+            if not fields:
+                continue
             if fields[0] != "INCLUDE":
                 continue
 
@@ -210,90 +216,26 @@ class commissioner(driver.driver):
         f.close()
 
         if out is None:
-            sys.exit("Did not find %s in %s" % (self.rbx, filename))
+            sys.exit("Did not find %s in 'pro' version of %s" % (self.rbx, "/".join(["HcalCfg"] + filename.split("/")[-3:-1])))
         return out
 
 
     def fec(self):
-        # USC: http://cmsonline.cern.ch/cms-elog/1082901
-        # 904: http://hcal904daq02.cms904/cgi-bin/cvsweb.cgi/HcalCfg/CCMServer/top_hb904_4.txt?rev=1.19
-
         # hbhe_full = (3, 1, 2, 0x14032018)
         hbhe_full = (3, 1, 2, 0x20102017)
         hbhe_half = (4, 3, 9, 0x2102019)
-
         fw = hbhe_half
-        fecs = "unknown"
-        sfp = 99
+        if self.rbx in ["HEM09", "HEP10"]:
+            fw = hbhe_full
 
-        if self.he:
-            if self.end == "M":
-                if self.sector in [9, 29]:
-                    fw = hbhe_full
-                    fecs = "hefec1"
-                    sfp = 7 if self.sector == 9 else 3
-                elif self.sector <= 12:
-                    fecs = "hefec2"
-                    sfp = self.sector
-                else:
-                    fecs = "hefec3"
-                    sfp = self.sector - 12
-            elif self.end == "P":
-                if self.sector in [10, 30]:
-                    fw = hbhe_full
-                    fecs = "hefec1"
-                    sfp = 6 if self.sector == 10 else 2
-                elif self.sector <= 6:
-                    fecs = "hefec3"
-                    sfp = self.sector + 6
-                else:
-                    fecs = "hefec4"
-                    sfp = self.sector - 6
-
-            else:
-                fecs, sfp = self.fec_and_sfp()
-
-        elif self.hf:
+        if self.hf:
             fw = (3, 1, 2, 0x16042018)
-            if self.end == "M" and 1 <= self.sector <= 6:
-                fecs = "hffec1"
-                sfp = 1 + self.sector
-            elif self.end == "M" and 7 <= self.sector <= 8:
-                fecs = "hffec2"
-                sfp = self.sector - 5
-            elif self.end == "P" and 1 <= self.sector <= 4:
-                fecs = "hffec2"
-                sfp = 3 + self.sector
-            elif self.end == "P" and 5 <= self.sector <= 8:
-                fecs = "hffec3"
-                sfp = self.sector - 3
-            elif self.rbx == "lasermon" or self.rbx == "ZDCM":
-                fecs = "hffec3"
-                sfp = 6
-            elif self.rbx == "ZDCP":
-                fecs = "hffec3"
-                sfp = 7
-            else:
-                fecs, sfp = self.fec_and_sfp()
-
-        elif self.hb:
-            if self.end in "MP":
-                offset = 1
-                if 1 <= self.sector <= 6:
-                    fecs = "hbfec%d" % (5 if self.end == "M" else 8)
-                elif 7 <= self.sector <= 12:
-                    fecs = "hbfec%d" % (6 if self.end == "M" else 9)
-                    offset += 12
-                elif 13 <= self.sector <= 18:
-                    fecs = "hbfec%d" % (7 if self.end == "M" else 10)
-                    offset += 24
-                sfp = 2 * self.sector - offset
-            else:  # 904
-                fecs, sfp = self.fec_and_sfp()
 
         if self.options.bat28:
             fecs = "fec1"
             sfp = 1
+        else:
+            fecs, sfp = self.fec_and_sfp()
 
         print("")
         print("-" * 7)
