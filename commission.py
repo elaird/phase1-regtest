@@ -474,6 +474,17 @@ class commissioner(driver.driver):
                     stemQ = "%d" % iRm
                     qie = "QIE[1-%d]" % nCh
 
+                items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
+                items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
+                if full:
+                    items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
+                    items.append(("%s-B_bc0_status_count" % stem, None, None))
+                    # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
+                    items.append(("%s-B_SCRATCH_rr" % stem, None, None))
+                    items.append(("%s-B_SHT_temp_f_rr" % stem, 27.0, 7.0))
+                    items.append(("%s-UniqueID_rr" % stem, None, None))
+                    #items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
+
                 for igloo in ["iBot", "iTop"] if self.hb else ["i"]:
                     items.append(("%s-%s_FPGA_MAJOR_VERSION_rr" % (stem, igloo), 1 if self.hb else 3, None))
                     items.append(("%s-%s_FPGA_MINOR_VERSION_rr" % (stem, igloo), 3 if self.hb else 9, None))
@@ -482,17 +493,6 @@ class commissioner(driver.driver):
                         items.append(("%s-%s_WTE_count_rr" % (stem, igloo), None, None))
                         items.append(("%s-%s_Clk_count_rr" % (stem, igloo), None, None))
                         items.append(("%s-%s_bc0_status_count_a_rr" % (stem, igloo), None, None))
-
-                    items.append(("%s-B_FIRMVERSION_MAJOR" % stem, 4, None))
-                    items.append(("%s-B_FIRMVERSION_MINOR" % stem, 2, None))
-                    if full:
-                        items.append(("%s-B_WTECOUNTER_rr" % stem, None, None))
-                        items.append(("%s-B_bc0_status_count" % stem, None, None))
-                        # items.append(("%s-B_FIRMVERSION_SVN" % stem, 2, None))
-                        items.append(("%s-B_SCRATCH_rr" % stem, None, None))
-                        items.append(("%s-B_SHT_temp_f_rr" % stem, 27.0, 7.0))
-                        items.append(("%s-UniqueID_rr" % stem, None, None))
-                        #items.append(("%s-B_SHT_rh_f_rr" % stem, 15.0, 10.0))
 
                 # items.append(("%s-%s_Gsel" % (stemQ, qie), None, None))
                 # items.append(("%s-%s_PedestalDAC" % (stemQ, qie), None, None))
