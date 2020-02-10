@@ -488,6 +488,10 @@ class commissioner(driver.driver):
                 for igloo in ["iBot", "iTop"] if self.hb else ["i"]:
                     items.append(("%s-%s_FPGA_MAJOR_VERSION_rr" % (stem, igloo), 1 if self.hb else 3, None))
                     items.append(("%s-%s_FPGA_MINOR_VERSION_rr" % (stem, igloo), 3 if self.hb else 9, None))
+                    items.append(("%s-%s_bc0_status_min_a" % (stem, igloo), 0xdeb, 0))
+                    items.append(("%s-%s_bc0_status_max_a" % (stem, igloo), 0xdeb, 0))
+                    items.append(("%s-%s_bc0_status_missing_a" % (stem, igloo), 0, 0))
+                    items.append(("%s-%s_bc0_status_shift_a" % (stem, igloo), 0, 0))
                     if full:
                         items.append(("%s-%s_scratch_rr"   % (stem, igloo), None, None))
                         items.append(("%s-%s_WTE_count_rr" % (stem, igloo), None, None))
