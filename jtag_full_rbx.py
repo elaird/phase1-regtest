@@ -24,6 +24,8 @@ def targets(rbx, options, nRms=4):
         out += ["calib", "pulser"]
     if rbx.startswith("HB"):
         out += ["calib-iTop", "calib-iBot", "pulser"]
+    if options.program and out and out[-1] == "pulser":
+        out.pop()
     return out
 
 
