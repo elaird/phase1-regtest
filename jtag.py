@@ -71,7 +71,7 @@ def check_target(target):
     return target, rbx
 
 
-def opts(full_rbx=False):
+def opts(full_rbx=False, protect=True):
     target = "RBX" if full_rbx else "FPGA_TARGET"
     parser = optparse.OptionParser(usage="\n".join(["usage: %prog [options] " + target,
                                                     "(implements https://twiki.cern.ch/twiki/bin/view/CMS/HCALngFECprotocol#Extra_steps_for_JTAG_programming)"
@@ -105,7 +105,7 @@ def opts(full_rbx=False):
     parser.add_option("--stp-igloo-HB",
                       dest="stpIglooHb",
                       metavar="a.stp",
-                      default="/nfshome0/elaird/firmware/fixed_HB_RM_v1_03.stp",
+                      default="/nfshome0/elaird/firmware/fixed_HB_RM_v2_00.stp",
                       help="[default %default]")
     parser.add_option("--stp-igloo-HB-bypass-test",
                       dest="stpIglooHbBypassTest",
@@ -171,6 +171,7 @@ def opts(full_rbx=False):
                       default=False,
                       action="store_true",
                       help="do BYPASS_TEST")
+
     if full_rbx:
         parser.add_option("--reverse",
                           dest="reverse",
@@ -180,23 +181,24 @@ def opts(full_rbx=False):
         parser.add_option("--niterations",
                           dest="nIterations",
                           metavar="N",
-                          default=2,
+                          default=1,
                           type="int",
                           help="number of tries [default %default]")
     else:
-        parser.add_option("--program",
-                          dest="program",
-                          default=False,
-                          action="store_true",
-                          help="do PROGRAM")
         parser.add_option("--log-file",
                           dest="logfile",
                           default="jtag.log",
                           help="log file to which to append [default %default]")
 
-    options, args = parser.parse_args()
+    if not (full_rbx and protect):
+        parser.add_option("--program",
+                          dest="program",
+                          default=False,
+                          action="store_true",
+                          help="do PROGRAM")
 
-    if full_rbx:  # avoid programming entire RBX
+    options, args = parser.parse_args()
+    if full_rbx and protect:
         options.program = False
 
     if len(args) != 1:
